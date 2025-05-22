@@ -45,6 +45,7 @@ if __name__ == "__main__":
     P0 = sigma_P**2 * np.eye(Nz)
     z0 = np.ones((Nz, 1))
 
+    Q_inv = np.linalg.inv(Q)
     Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q))
 
     reg1 = 113
