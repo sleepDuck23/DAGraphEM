@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.linalg import schur, solve
-import control 
 
 
 from tools.matrix import Extend_matA

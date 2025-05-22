@@ -49,7 +49,10 @@ if __name__ == "__main__":
 
     reg1 = 113
     gamma1 = 20
-    num_adam_steps = 50
+    num_adam_steps = 1000
+    lambda_reg = 20
+    alpha = 25
+    stepsize = 0.1
 
     reg = {}
     reg['reg1'] = reg1
@@ -95,11 +98,6 @@ if __name__ == "__main__":
         Maj_after = np.zeros(Nit_em)
 
         #x = np.stack(x, axis=1)  
-
-        lambda_reg = 0.1
-        alpha = 0.5
-        stepsize = 0.01
-        optimizer = torch.optim.Adam([A], lr=stepsize)
 
         for i in range(Nit_em):  # EM iterations
             # 1/ Kalman filter filter
@@ -150,22 +148,30 @@ if __name__ == "__main__":
             
             #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
             A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
+            optimizer = torch.optim.Adam([A], lr=1e-5)
 
             for step in range(num_adam_steps):
+                #Sigma_scaled = Sigma / np.linalg.norm(Sigma, 'fro')
+                #C_scaled = C / np.linalg.norm(C, 'fro')
+                #Phi_scaled = Phi / np.linalg.norm(Phi, 'fro')
+
                 # Convert all to PyTorch tensors
                 Sigma_torch = numpy_to_torch(Sigma)
                 C_torch = numpy_to_torch(C)
                 Phi_torch = numpy_to_torch(Phi)
 
                 optimizer.zero_grad()
-                loss = compute_loss(A)
+                loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
                 if not torch.isfinite(loss):
                     print("Non-finite loss encountered")
                     break
                 loss.backward()
+                #torch.nn.utils.clip_grad_norm_([A], max_norm=10.0)
                 optimizer.step()
-                if step % 10 == 0:
+                if step % 100 == 0:
                     print(f"Adam Step {step}, Loss: {loss.item():.6f}")
+                    grad_norm = A.grad.norm().item()
+                    print(f"Grad norm: {grad_norm:.6f}")
 
             D1_em = A.detach().cpu().numpy()
             

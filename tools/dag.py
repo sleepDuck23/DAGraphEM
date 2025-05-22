@@ -4,7 +4,7 @@ import torch
 def numpy_to_torch(x):
     return torch.tensor(x, dtype=torch.float32)
 
-def logde_dag(A):
+def logdet_dag(A):
     # A∘A = elementwise square, I = identity
     I = torch.eye(A.shape[0], dtype=A.dtype, device=A.device)
     mat = I - A * A
@@ -30,6 +30,6 @@ def compute_loss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5):
     f2 = lambda_reg * torch.norm(A, p=1)
 
     # logdet penalty
-    h = alpha * logde_dag(A)
+    h = alpha * logdet_dag(A)
 
     return f1 + f2 + h
