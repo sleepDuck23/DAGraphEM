@@ -5,12 +5,14 @@ import matplotlib.pyplot as plt
 import os
 import time
 import networkx as nx
+import torch
 
 from tools.matrix import calError
 from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
 from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_update
 from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
+from tools.dag import numpy_to_torch, logdet_dag, compute_loss
 
 if __name__ == "__main__":
     K = 2000  # length of time series
@@ -43,6 +45,8 @@ if __name__ == "__main__":
     P0 = sigma_P**2 * np.eye(Nz)
     z0 = np.ones((Nz, 1))
 
+    Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q))
+
     reg1 = 113
     gamma1 = 20
 
@@ -62,6 +66,7 @@ if __name__ == "__main__":
     specificity = np.zeros(Nreal)
     F1score = np.zeros(Nreal)
     saveX = np.zeros((Nx, K, Nreal))
+
 
     for real in range(Nreal):
         print(f"---- REALIZATION {real + 1} ----")
@@ -89,6 +94,11 @@ if __name__ == "__main__":
         Maj_after = np.zeros(Nit_em)
 
         #x = np.stack(x, axis=1)  
+
+        lambda_reg = 0.1
+        alpha = 0.5
+        stepsize = 0.01
+        optimizer = torch.optim.Adam([A], lr=stepsize)
 
         for i in range(Nit_em):  # EM iterations
             # 1/ Kalman filter filter
@@ -137,25 +147,48 @@ if __name__ == "__main__":
             Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                 z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
             
+            #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
+            A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
 
-            # compute majorant function for ML term before update
-            Maj_before[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em, D2, Sigma, Phi, B, C, D, K)
-            Maj_before[i] = Maj_before[i] + Reg_before  # add prior term (= majorant for MAP term)
+            # Convert all to PyTorch tensors
+            Sigma_torch = numpy_to_torch(Sigma)
+            C_torch = numpy_to_torch(C)
+            Phi_torch = numpy_to_torch(Phi)
 
-            # 3/ EM Update
-            Maj_D1_before = ComputeMaj_D1(sigma_Q, D1_em, Sigma, Phi, C, K) + Reg_before
-            D1_em_ = GRAPHEM_update(Sigma, Phi, C, K, sigma_Q, reg, D1_em, Maj_D1_before)
+            optimizer.zero_grad()
+            loss = compute_loss(A)
+            if not torch.isfinite(loss):
+                print("Non-finite loss encountered")
+                break
+            loss.backward()
+            optimizer.step()
 
-            # compute majorant function for ML term after update (to check decrease)
-            Maj_after[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em_, D2, Sigma, Phi, B, C, D, K)
-            # add penalty function after update
-            Reg_after = Compute_Prior_D1(D1_em_, reg)
-            Maj_after[i] = Maj_after[i] + Reg_after
+            A_current = A.detach().cpu().numpy()
+            
+            #Below is the older implementation using MM-Douglas-Rachford method
 
-            D1_em = D1_em_  # D1 estimate updated
-            D1_em_save[:, :, i] = D1_em  # keep track of the sequence
+            ## compute majorant function for ML term before update
+            #Maj_before[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em, D2, Sigma, Phi, B, C, D, K)
+            #Maj_before[i] = Maj_before[i] + Reg_before  # add prior term (= majorant for MAP term)
 
-            Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
+            ## 3/ EM Update
+            #Maj_D1_before = ComputeMaj_D1(sigma_Q, D1_em, Sigma, Phi, C, K) + Reg_before
+            #D1_em_ = GRAPHEM_update(Sigma, Phi, C, K, sigma_Q, reg, D1_em, Maj_D1_before)
+
+            ## compute majorant function for ML term after update (to check decrease)
+            #Maj_after[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em_, D2, Sigma, Phi, B, C, D, K)
+            ## add penalty function after update
+            #Reg_after = Compute_Prior_D1(D1_em_, reg)
+            #Maj_after[i] = Maj_after[i] + Reg_after
+
+            #D1_em = D1_em_  # D1 estimate updated
+            #D1_em_save[:, :, i] = D1_em  # keep track of the sequence
+
+            #Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
+
+            D1_em_save[:, :, i] = A_current  # keep track of the sequence
+
+            Err_D1.append(np.linalg.norm(D1 - A_current, 'fro') / np.linalg.norm(D1, 'fro'))
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
