@@ -49,6 +49,7 @@ if __name__ == "__main__":
 
     reg1 = 113
     gamma1 = 20
+    num_adam_steps = 50
 
     reg = {}
     reg['reg1'] = reg1
@@ -150,20 +151,23 @@ if __name__ == "__main__":
             #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
             A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
 
-            # Convert all to PyTorch tensors
-            Sigma_torch = numpy_to_torch(Sigma)
-            C_torch = numpy_to_torch(C)
-            Phi_torch = numpy_to_torch(Phi)
+            for step in range(num_adam_steps):
+                # Convert all to PyTorch tensors
+                Sigma_torch = numpy_to_torch(Sigma)
+                C_torch = numpy_to_torch(C)
+                Phi_torch = numpy_to_torch(Phi)
 
-            optimizer.zero_grad()
-            loss = compute_loss(A)
-            if not torch.isfinite(loss):
-                print("Non-finite loss encountered")
-                break
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                loss = compute_loss(A)
+                if not torch.isfinite(loss):
+                    print("Non-finite loss encountered")
+                    break
+                loss.backward()
+                optimizer.step()
+                if step % 10 == 0:
+                    print(f"Adam Step {step}, Loss: {loss.item():.6f}")
 
-            A_current = A.detach().cpu().numpy()
+            D1_em = A.detach().cpu().numpy()
             
             #Below is the older implementation using MM-Douglas-Rachford method
 
@@ -182,13 +186,10 @@ if __name__ == "__main__":
             #Maj_after[i] = Maj_after[i] + Reg_after
 
             #D1_em = D1_em_  # D1 estimate updated
-            #D1_em_save[:, :, i] = D1_em  # keep track of the sequence
+            D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
-            #Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
+            Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
-            D1_em_save[:, :, i] = A_current  # keep track of the sequence
-
-            Err_D1.append(np.linalg.norm(D1 - A_current, 'fro') / np.linalg.norm(D1, 'fro'))
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
