@@ -13,6 +13,7 @@ from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_upd
 from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
 from tools.dag import numpy_to_torch, logdet_dag, compute_loss
+from tools.dagma import DagmaLinear
 
 if __name__ == "__main__":
     K = 2000  # length of time series
@@ -86,7 +87,7 @@ if __name__ == "__main__":
 
         Err_D1 = []
         Nit_em = 50  # number of iterations maximum for EM loop
-        prec = 1e-2  # precision for EM loop
+        prec = 1e-3  # precision for EM loop
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
@@ -99,6 +100,7 @@ if __name__ == "__main__":
         Maj_after = np.zeros(Nit_em)
 
         #x = np.stack(x, axis=1)  
+        model = DagmaLinear(loss_type='GraphEM',Q=Q,K=K)
 
         for i in range(Nit_em):  # EM iterations
             # 1/ Kalman filter filter
@@ -148,51 +150,7 @@ if __name__ == "__main__":
                                                 z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
             
             #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
-            A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-            optimizer = torch.optim.Adam([A], lr=1e-5)
-
-            for step in range(num_adam_steps):
-                #Sigma_scaled = Sigma / np.linalg.norm(Sigma, 'fro')
-                #C_scaled = C / np.linalg.norm(C, 'fro')
-                #Phi_scaled = Phi / np.linalg.norm(Phi, 'fro')
-
-                # Convert all to PyTorch tensors
-                Sigma_torch = numpy_to_torch(Sigma)
-                C_torch = numpy_to_torch(C)
-                Phi_torch = numpy_to_torch(Phi)
-
-                optimizer.zero_grad()
-                loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
-                if not torch.isfinite(loss):
-                    print("Non-finite loss encountered")
-                    break
-                loss.backward()
-                #torch.nn.utils.clip_grad_norm_([A], max_norm=10.0)
-                optimizer.step()
-                if step % 100 == 0:
-                    print(f"Adam Step {step}, Loss: {loss.item():.6f}")
-                    grad_norm = A.grad.norm().item()
-                    print(f"Grad norm: {grad_norm:.6f}")
-
-            D1_em = A.detach().cpu().numpy()
-            
-            #Below is the older implementation using MM-Douglas-Rachford method
-
-            ## compute majorant function for ML term before update
-            #Maj_before[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em, D2, Sigma, Phi, B, C, D, K)
-            #Maj_before[i] = Maj_before[i] + Reg_before  # add prior term (= majorant for MAP term)
-
-            ## 3/ EM Update
-            #Maj_D1_before = ComputeMaj_D1(sigma_Q, D1_em, Sigma, Phi, C, K) + Reg_before
-            #D1_em_ = GRAPHEM_update(Sigma, Phi, C, K, sigma_Q, reg, D1_em, Maj_D1_before)
-
-            ## compute majorant function for ML term after update (to check decrease)
-            #Maj_after[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em_, D2, Sigma, Phi, B, C, D, K)
-            ## add penalty function after update
-            #Reg_after = Compute_Prior_D1(D1_em_, reg)
-            #Maj_after[i] = Maj_after[i] + Reg_after
-
-            #D1_em = D1_em_  # D1 estimate updated
+            D1_em = model.fit(Sigma, C, Phi, W_init=D1_em, lambda1=0.02)
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))

@@ -6,6 +6,7 @@ from tqdm.auto import tqdm
 import typing
 
 
+
 __all__ = ["DagmaLinear"]
 
 class DagmaLinear:
@@ -13,7 +14,7 @@ class DagmaLinear:
     A Python object that contains the implementation of DAGMA for linear models using numpy and scipy.
     """
     
-    def __init__(self, loss_type: str, verbose: bool = False, dtype: type = np.float64) -> None:
+    def __init__(self, loss_type: str, Q: np.ndarray, K: int, verbose: bool = False, dtype: type = np.float64, Sigma=None, C=None, Phi=None,Qinv = None) -> None:
         r"""
         Parameters
         ----------
@@ -33,7 +34,10 @@ class DagmaLinear:
         self.loss_type = loss_type
         self.dtype = dtype
         self.vprint = print if verbose else lambda *a, **k: None
-            
+        self.Q = Q.astype(dtype)
+        self.Qinv = np.linalg.inv(self.Q)
+        self.K = float(K)
+
     def _score(self, W: np.ndarray) -> typing.Tuple[float, np.ndarray]:
         r"""
         Evaluate value and gradient of the score function.
@@ -57,6 +61,19 @@ class DagmaLinear:
             R = self.X @ W
             loss = 1.0 / self.n * (np.logaddexp(0, R) - self.X * R).sum()
             G_loss = (1.0 / self.n * self.X.T) @ sigmoid(R) - self.cov
+        elif self.loss_type == 'GraphEM':
+            QSigma = self.Qinv @ self.Sigma
+            QCW = self.Qinv @ self.C @ W .T
+            QWC = self.Qinv @ W  @ (self.C).T
+            QWPhiW = self.Qinv @ W  @ self.Phi @ W .T
+            CQ = self.C.T @ self.Qinv 
+            QC = self.Qinv @ self.C.T
+            PhiihP = self.Phi + self.Phi.T
+            WPhi = W  @ PhiihP
+            QWPhi = self.Qinv @ WPhi
+
+            loss = 0.5 * self.K * np.trace(QSigma - QCW - QWC + QWPhiW)
+            G_loss = 0.5 * self.K * (-CQ - QC + QWPhi)
         return loss, G_loss
 
     def _h(self, W: np.ndarray, s: float = 1.0) -> typing.Tuple[float, np.ndarray]:
@@ -184,7 +201,7 @@ class DagmaLinear:
             mask_inc[self.inc_r, self.inc_c] = -2 * mu * self.lambda1
         mask_exc = np.ones((self.d, self.d), dtype=self.dtype)
         if self.exc_c is not None:
-                mask_exc[self.exc_r, self.exc_c] = 0.
+            mask_exc[self.exc_r, self.exc_c] = 0.
                 
         for iter in range(1, max_iter+1):
             ## Compute the (sub)gradient of the objective
@@ -206,6 +223,8 @@ class DagmaLinear:
                 G_score = -mu * self.cov @ (self.Id - W) 
             elif self.loss_type == 'logistic':
                 G_score = mu / self.n * self.X.T @ sigmoid(self.X @ W) - mu * self.cov
+            elif self.loss_type == 'GraphEM':
+                G_score = mu * 0.5 * self.K * (-(self.C.T @ self.Qinv) - (self.Qinv @ self.C.T) + self.Qinv @ W @ (self.Phi + self.Phi.T))
             
             Gobj = G_score + mu * self.lambda1 * np.sign(W) + 2 * W * M.T + mask_inc * np.sign(W)
             
@@ -229,15 +248,19 @@ class DagmaLinear:
         return W, True
     
     def fit(self, 
-            X: np.ndarray,
-            lambda1: float = 0.03, 
-            w_threshold: float = 0.3, 
+            #X: np.ndarray,
+            Sigma: np.ndarray,
+            C: np.ndarray, 
+            Phi: np.ndarray,
+            W_init=None,
+            lambda1: float = 0.2, 
+            w_threshold: float = 0.03, 
             T: int = 5,
             mu_init: float = 1.0, 
             mu_factor: float = 0.1, 
             s: typing.Union[typing.List[float], float] = [1.0, .9, .8, .7, .6], 
             warm_iter: int = 3e4, 
-            max_iter: int = 6e4, 
+            max_iter: int = 200, 
             lr: float = 0.0003, 
             checkpoint: int = 1000, 
             beta_1: float = 0.99, 
@@ -297,14 +320,20 @@ class DagmaLinear:
             While DAGMA ensures to exclude the edges given in ``exclude_edges``, the current implementation does not guarantee that all edges
             in ``included edges`` will be part of the final DAG.
         """ 
-        
+        # I did excluded X from original code (lines commented)
+
         ## INITALIZING VARIABLES 
-        self.X, self.lambda1, self.checkpoint = X, lambda1, checkpoint
-        self.n, self.d = X.shape
+        #self.X, self.lambda1, self.checkpoint = X, lambda1, checkpoint
+        self.lambda1, self.checkpoint = lambda1, checkpoint
+        #self.n, self.d = X.shape
+        self.Sigma = Sigma
+        self.C = C
+        self.Phi = Phi
+        self.n, self.d = C.shape
         self.Id = np.eye(self.d).astype(self.dtype)
         
-        if self.loss_type == 'l2':
-            self.X -= X.mean(axis=0, keepdims=True)
+        #if self.loss_type == 'l2':
+        #    self.X -= X.mean(axis=0, keepdims=True)
         
         self.exc_r, self.exc_c = None, None
         self.inc_r, self.inc_c = None, None
@@ -321,8 +350,12 @@ class DagmaLinear:
             else:
                 ValueError("whitelist should be a tuple of edges, e.g., ((1,2), (2,3))")        
             
-        self.cov = X.T @ X / float(self.n)    
-        self.W_est = np.zeros((self.d,self.d)).astype(self.dtype) # init W0 at zero matrix
+        #self.cov = X.T @ X / float(self.n)
+        if W_init is not None:
+            self.W_est = W_init.copy()
+        else:    
+            self.W_est = np.zeros((self.d,self.d)).astype(self.dtype) # init W0 at zero matrix
+
         mu = mu_init
         if type(s) == list:
             if len(s) < T: 
@@ -355,6 +388,5 @@ class DagmaLinear:
         return self.W_est
 
 
-    
 
     
