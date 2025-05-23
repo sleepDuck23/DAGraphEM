@@ -6,6 +6,7 @@ import os
 import time
 import networkx as nx
 import torch
+from scipy.linalg import expm
 
 from tools.matrix import calError
 from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
@@ -85,6 +86,7 @@ if __name__ == "__main__":
         print(f"Regularization on D1: norm {reg1} with gamma1 = {gamma1}")
 
         Err_D1 = []
+        charac_dag = []
         Nit_em = 50  # number of iterations maximum for EM loop
         prec = 1e-2  # precision for EM loop
 
@@ -197,10 +199,12 @@ if __name__ == "__main__":
 
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
+            charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec:
+                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < prec:
                     print(f"EM converged after iteration {i + 1}")
                     break
 
@@ -283,5 +287,13 @@ if __name__ == "__main__":
         plt.title('Loss function')
         plt.xlabel('GRAPHEM iterations')
         plt.ylabel('Loss Value')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(5)
+        plt.semilogy(charac_dag)
+        plt.title('DAG characterization of A')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('Characterization')
         plt.grid(True)
         plt.show()

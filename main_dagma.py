@@ -6,6 +6,7 @@ import os
 import time
 import networkx as nx
 import torch
+from scipy.linalg import expm
 
 from tools.matrix import calError
 from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
@@ -32,7 +33,7 @@ if __name__ == "__main__":
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(3, graph_type='ER', edge_prob=0.95, seed=42) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -86,8 +87,10 @@ if __name__ == "__main__":
         print(f"Regularization on D1: norm {reg1} with gamma1 = {gamma1}")
 
         Err_D1 = []
-        Nit_em = 50  # number of iterations maximum for EM loop
-        prec = 1e-3  # precision for EM loop
+        charac_dag = []
+        Nit_em = 100  # number of iterations maximum for EM loop
+        prec = 1e-5  # precision for EM loop
+        prec_dag = 1e-5 #precision for dag constraint
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
@@ -150,21 +153,26 @@ if __name__ == "__main__":
                                                 z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
             
             #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
-            D1_em = model.fit(Sigma, C, Phi, W_init=D1_em, lambda1=0.02)
+            D1_em = model.fit(Sigma, C, Phi, W_init=D1_em, lambda1=20)
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
+            charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+            
+
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec:
+                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec  and charac_dag[i] < prec_dag:
                     print(f"EM converged after iteration {i + 1}")
                     break
 
         tEnd[real] = time.perf_counter() - tStart
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
+
+        
 
         threshold = 1e-10
         D1_binary = np.abs(D1) >= threshold
@@ -241,5 +249,13 @@ if __name__ == "__main__":
         plt.title('Loss function')
         plt.xlabel('GRAPHEM iterations')
         plt.ylabel('Loss Value')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(5)
+        plt.semilogy(charac_dag)
+        plt.title('DAG characterization of A')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('Characterization')
         plt.grid(True)
         plt.show()
