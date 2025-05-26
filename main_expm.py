@@ -5,12 +5,15 @@ import matplotlib.pyplot as plt
 import os
 import time
 import networkx as nx
+import torch
+from scipy.linalg import expm
 
 from tools.matrix import calError
 from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
 from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_update
 from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
+from tools.dag import numpy_to_torch, logdet_dag, compute_loss
 
 if __name__ == "__main__":
     K = 2000  # length of time series
@@ -43,8 +46,15 @@ if __name__ == "__main__":
     P0 = sigma_P**2 * np.eye(Nz)
     z0 = np.ones((Nz, 1))
 
+    Q_inv = np.linalg.inv(Q)
+    Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q))
+
     reg1 = 113
     gamma1 = 20
+    num_adam_steps = 2000
+    lambda_reg = 20
+    alpha = 25
+    stepsize = 0.1
 
     reg = {}
     reg['reg1'] = reg1
@@ -63,6 +73,7 @@ if __name__ == "__main__":
     F1score = np.zeros(Nreal)
     saveX = np.zeros((Nx, K, Nreal))
 
+
     for real in range(Nreal):
         print(f"---- REALIZATION {real + 1} ----")
 
@@ -75,8 +86,10 @@ if __name__ == "__main__":
         print(f"Regularization on D1: norm {reg1} with gamma1 = {gamma1}")
 
         Err_D1 = []
+        charac_dag = []
         Nit_em = 50  # number of iterations maximum for EM loop
         prec = 1e-2  # precision for EM loop
+        w_threshold = 0.1
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
@@ -137,33 +150,70 @@ if __name__ == "__main__":
             Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                 z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
             
+            #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
+            A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
+            optimizer = torch.optim.Adam([A], lr=1e-5)
 
-            # compute majorant function for ML term before update
-            Maj_before[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em, D2, Sigma, Phi, B, C, D, K)
-            Maj_before[i] = Maj_before[i] + Reg_before  # add prior term (= majorant for MAP term)
+            for step in range(num_adam_steps):
+                #Sigma_scaled = Sigma / np.linalg.norm(Sigma, 'fro')
+                #C_scaled = C / np.linalg.norm(C, 'fro')
+                #Phi_scaled = Phi / np.linalg.norm(Phi, 'fro')
 
-            # 3/ EM Update
-            Maj_D1_before = ComputeMaj_D1(sigma_Q, D1_em, Sigma, Phi, C, K) + Reg_before
-            D1_em_ = GRAPHEM_update(Sigma, Phi, C, K, sigma_Q, reg, D1_em, Maj_D1_before)
+                # Convert all to PyTorch tensors
+                Sigma_torch = numpy_to_torch(Sigma)
+                C_torch = numpy_to_torch(C)
+                Phi_torch = numpy_to_torch(Phi)
 
-            # compute majorant function for ML term after update (to check decrease)
-            Maj_after[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em_, D2, Sigma, Phi, B, C, D, K)
-            # add penalty function after update
-            Reg_after = Compute_Prior_D1(D1_em_, reg)
-            Maj_after[i] = Maj_after[i] + Reg_after
+                optimizer.zero_grad()
+                loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
+                if not torch.isfinite(loss):
+                    print("Non-finite loss encountered")
+                    break
+                loss.backward()
+                #torch.nn.utils.clip_grad_norm_([A], max_norm=10.0)
+                optimizer.step()
+                if step % 100 == 0:
+                    print(f"Adam Step {step}, Loss: {loss.item():.6f}")
+                    grad_norm = A.grad.norm().item()
+                    print(f"Grad norm: {grad_norm:.6f}")
 
-            D1_em = D1_em_  # D1 estimate updated
+            D1_em = A.detach().cpu().numpy()
+            
+            #Below is the older implementation using MM-Douglas-Rachford method
+
+            ## compute majorant function for ML term before update
+            #Maj_before[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em, D2, Sigma, Phi, B, C, D, K)
+            #Maj_before[i] = Maj_before[i] + Reg_before  # add prior term (= majorant for MAP term)
+
+            ## 3/ EM Update
+            #Maj_D1_before = ComputeMaj_D1(sigma_Q, D1_em, Sigma, Phi, C, K) + Reg_before
+            #D1_em_ = GRAPHEM_update(Sigma, Phi, C, K, sigma_Q, reg, D1_em, Maj_D1_before)
+
+            ## compute majorant function for ML term after update (to check decrease)
+            #Maj_after[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em_, D2, Sigma, Phi, B, C, D, K)
+            ## add penalty function after update
+            #Reg_after = Compute_Prior_D1(D1_em_, reg)
+            #Maj_after[i] = Maj_after[i] + Reg_after
+
+            #D1_em = D1_em_  # D1 estimate updated
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
+            charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+
+
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec:
+                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < prec:
                     print(f"EM converged after iteration {i + 1}")
                     break
 
+
         tEnd[real] = time.perf_counter() - tStart
+
+        D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
+        
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
 
@@ -242,5 +292,13 @@ if __name__ == "__main__":
         plt.title('Loss function')
         plt.xlabel('GRAPHEM iterations')
         plt.ylabel('Loss Value')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(5)
+        plt.semilogy(charac_dag)
+        plt.title('DAG characterization of A')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('Characterization')
         plt.grid(True)
         plt.show()

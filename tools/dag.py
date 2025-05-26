@@ -30,6 +30,7 @@ def compute_loss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5):
     f2 = lambda_reg * torch.norm(A, p=1)
 
     # logdet penalty
-    h = alpha * logdet_dag(A)
+    #h = alpha * logdet_dag(A)
+    h = torch.trace(torch.linalg.matrix_exp(A*A)) - A.shape[0]
 
     return f1 + f2 + h

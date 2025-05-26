@@ -18,7 +18,7 @@ from tools.dagma import DagmaLinear
 
 if __name__ == "__main__":
     K = 2000  # length of time series
-    flag_plot = 1
+    flag_plot = 0
 
     # Load ground truth matrix D1
     try:
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(3, graph_type='ER', edge_prob=0.95, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.6, seed=42) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     reg1 = 113
     gamma1 = 20
-    num_adam_steps = 2000
+    num_adam_steps = 1
     lambda_reg = 20
     alpha = 25
     stepsize = 0.1
@@ -153,7 +153,7 @@ if __name__ == "__main__":
                                                 z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
             
             #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
-            D1_em = model.fit(Sigma, C, Phi, W_init=D1_em, lambda1=20)
+            D1_em = model.fit(Sigma, C, Phi, warm_iter=5000, max_iter = 10000, W_init=D1_em, lambda1=20)
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))

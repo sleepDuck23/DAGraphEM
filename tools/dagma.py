@@ -67,10 +67,8 @@ class DagmaLinear:
             QWC = self.Qinv @ W  @ (self.C).T
             QWPhiW = self.Qinv @ W  @ self.Phi @ W .T
             CQ = self.C.T @ self.Qinv 
-            QC = self.Qinv @ self.C.T
-            PhiihP = self.Phi + self.Phi.T
-            WPhi = W  @ PhiihP
-            QWPhi = self.Qinv @ WPhi
+            QC = self.Qinv @ self.C
+            QWPhi = W @ (self.Qinv @ self.Phi + self.Phi @ self.Qinv)
 
             loss = 0.5 * self.K * np.trace(QSigma - QCW - QWC + QWPhiW)
             G_loss = 0.5 * self.K * (-CQ - QC + QWPhi)
@@ -224,7 +222,7 @@ class DagmaLinear:
             elif self.loss_type == 'logistic':
                 G_score = mu / self.n * self.X.T @ sigmoid(self.X @ W) - mu * self.cov
             elif self.loss_type == 'GraphEM':
-                G_score = mu * 0.5 * self.K * (-(self.C.T @ self.Qinv) - (self.Qinv @ self.C.T) + self.Qinv @ W @ (self.Phi + self.Phi.T))
+                G_score = mu * 0.5 * self.K * (-(self.C.T @ self.Qinv) - (self.Qinv @ self.C) + W @ (self.Qinv @ self.Phi + self.Phi @ self.Qinv))
             
             Gobj = G_score + mu * self.lambda1 * np.sign(W) + 2 * W * M.T + mask_inc * np.sign(W)
             
