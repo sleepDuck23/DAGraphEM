@@ -19,20 +19,20 @@ if __name__ == "__main__":
     K = 2000  # length of time series
     flag_plot = 1
 
-    # Load ground truth matrix D1
-    try:
-        data = scipy.io.loadmat('dataset/D1_datasetA_icassp.mat')
-        D1 = data['D1']
-    except FileNotFoundError:
-        print("Error: datasets/D1_datasetA_icassp.mat not found. Using a dummy D1.")
-        Nx = 15  # Dummy size
-        D1 = prox_stable(np.random.rand(Nx, Nx) - 0.5, 1)
-    Nx = D1.shape[0]  # number of nodes
-    Nz = Nx
-    D2 = np.eye(Nz)  # for simplicity and identifiability purposes
+    ## Load ground truth matrix D1
+    #try:
+    #    data = scipy.io.loadmat('dataset/D1_datasetA_icassp.mat')
+    #    D1 = data['D1']
+    #except FileNotFoundError:
+    #    print("Error: datasets/D1_datasetA_icassp.mat not found. Using a dummy D1.")
+    #    Nx = 15  # Dummy size
+    #    D1 = prox_stable(np.random.rand(Nx, Nx) - 0.5, 1)
+    #Nx = D1.shape[0]  # number of nodes
+    #Nz = Nx
+    #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(15, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(7, graph_type='SF', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -51,9 +51,9 @@ if __name__ == "__main__":
 
     reg1 = 113
     gamma1 = 20
-    num_adam_steps = 2000
-    lambda_reg = 20
-    alpha = 25
+    num_adam_steps = 1000
+    lambda_reg = 50
+    alpha = 50
     stepsize = 0.1
 
     reg = {}
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         saveX[:, :, real] = x[real]
 
         # Inference (GRAPHEM algorithm)
-        print('-- GRAPHEM --')
+        print('-- GRAPHEM + DAG --')
         print(f"Regularization on D1: norm {reg1} with gamma1 = {gamma1}")
 
         Err_D1 = []
@@ -104,6 +104,10 @@ if __name__ == "__main__":
         #x = np.stack(x, axis=1)  
 
         for i in range(Nit_em):  # EM iterations
+            # Just for visualization purposes
+            if i % 10 == 0:
+                    print(f"EM Step {i}")
+            
             # 1/ Kalman filter filter
             z_mean_kalman_em = np.zeros((Nz, K))
             P_kalman_em = np.zeros((Nz, Nz, K))
@@ -152,7 +156,7 @@ if __name__ == "__main__":
             
             #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
             A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-            optimizer = torch.optim.Adam([A], lr=1e-5)
+            optimizer = torch.optim.Adam([A], lr=1e-4)
 
             for step in range(num_adam_steps):
                 #Sigma_scaled = Sigma / np.linalg.norm(Sigma, 'fro')
@@ -172,10 +176,10 @@ if __name__ == "__main__":
                 loss.backward()
                 #torch.nn.utils.clip_grad_norm_([A], max_norm=10.0)
                 optimizer.step()
-                if step % 100 == 0:
-                    print(f"Adam Step {step}, Loss: {loss.item():.6f}")
+                if step % 250 == 0 and i % 10 == 0:
+                    print(f"Adam Step {step}, Loss: {loss.item():.2f}")
                     grad_norm = A.grad.norm().item()
-                    print(f"Grad norm: {grad_norm:.6f}")
+                    print(f"Grad norm: {grad_norm:.2f}")
 
             D1_em = A.detach().cpu().numpy()
             
@@ -213,7 +217,7 @@ if __name__ == "__main__":
         tEnd[real] = time.perf_counter() - tStart
 
         D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
-        
+
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
 
