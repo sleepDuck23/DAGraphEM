@@ -27,8 +27,11 @@ RMSE_results = []
 meanRMSE = [ [ 0 for i in range(len(lambda_reg)) ] for j in range(len(nodes_size)) ] 
 
 for param in range(len(lambda_reg)):
+    print(f"---- Lambda: {lambda_reg[param]} ----")
     for nodex in range(len(nodes_size)):
+        print(f"---- Nodes: {nodes_size[nodex]} ----")
         for seeds in random_seed:
+            print(f"---- Seed: {seeds} ----")
             if __name__ == "__main__":
                 K = 2000  # length of time series
                 flag_plot = 0
@@ -89,15 +92,12 @@ for param in range(len(lambda_reg)):
 
 
                 for real in range(Nreal):
-                    print(f"---- REALIZATION {real + 1} ----")
-
                     # Synthetic data generation
                     y, x = GenerateSynthetic_order_p(K, D1, D2, p, z0, sigma_P, sigma_Q, sigma_R)
                     saveX[:, :, real] = x[real]
 
                     # Inference (GRAPHEM algorithm)
                     print('-- GRAPHEM + DAG --')
-                    print(f"Regularization on D1: norm {reg1} with gamma1 = {gamma1}")
 
                     Err_D1 = []
                     charac_dag = []
@@ -119,7 +119,7 @@ for param in range(len(lambda_reg)):
 
                     for i in range(Nit_em):  # EM iterations
                         # Just for visualization purposes
-                        if i % 10 == 0:
+                        if i % 25 == 0:
                                 print(f"EM Step {i}")
                         
                         # 1/ Kalman filter filter
