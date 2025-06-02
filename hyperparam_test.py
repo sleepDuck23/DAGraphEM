@@ -20,16 +20,16 @@ The goal of this file is to understand the behavior of each hyper-parameter in t
 At each run we will test a chosen parameter with multiple graphs and increasing the number of nodes
 The result of this file should be a series of plots to analyze the behavior of such parameter
 """
-lambda_reg = [10,20,50,75,100]
-nodes_size = [4,6,8,10,15]
-random_seed = [40,41,42,43,44]
+alpha = [25,50]
+nodes_size = [4,6,8,10]
+random_seed = [40,41]
 RMSE_results = []
-meanRMSE = [ [ 0 for i in range(len(lambda_reg)) ] for j in range(len(nodes_size)) ] 
+meanRMSE = [ [ 0 for i in range(len(nodes_size)) ] for j in range(len(alpha)) ] 
 
-for param in range(len(lambda_reg)):
-    print(f"---- Lambda: {lambda_reg[param]} ----")
+for param in range(len(alpha)):
+    print(f"-------------------- Alpha: {alpha[param]} --------------------")
     for nodex in range(len(nodes_size)):
-        print(f"---- Nodes: {nodes_size[nodex]} ----")
+        print(f"------------ Nodes: {nodes_size[nodex]} ------------")
         for seeds in random_seed:
             print(f"---- Seed: {seeds} ----")
             if __name__ == "__main__":
@@ -69,8 +69,8 @@ for param in range(len(lambda_reg)):
                 reg1 = 113
                 gamma1 = 20
                 num_adam_steps = 1000
-                #lambda_reg = 50 #Being tested as study parameter
-                alpha = 50
+                lambda_reg = 50 
+                #alpha = 50 #Being tested as study parameter
                 stepsize = 0.1
 
                 reg = {}
@@ -183,14 +183,14 @@ for param in range(len(lambda_reg)):
                             Phi_torch = numpy_to_torch(Phi)
 
                             optimizer.zero_grad()
-                            loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg[param],alpha)
+                            loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha[param])
                             if not torch.isfinite(loss):
                                 print("Non-finite loss encountered")
                                 break
                             loss.backward()
                             #torch.nn.utils.clip_grad_norm_([A], max_norm=10.0)
                             optimizer.step()
-                            if step % 250 == 0 and i % 10 == 0:
+                            if step % 1001 == 0 and i % 10 == 0:
                                 print(f"Adam Step {step}, Loss: {loss.item():.2f}")
                                 grad_norm = A.grad.norm().item()
                                 print(f"Grad norm: {grad_norm:.2f}")
@@ -223,29 +223,6 @@ for param in range(len(lambda_reg)):
                     D1_em_binary = np.abs(D1_em_final) >= threshold
                     TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
 
-                    #plt.figure(30, figsize=(10, 5))
-                    #plt.subplot(1, 2, 1)
-                    #G_true = nx.DiGraph(D1)
-                    #weights_true = np.array([abs(G_true[u][v]['weight']) for u, v in G_true.edges()])
-                    #if weights_true.size > 0:
-                    #    linewidths_true = 5 * weights_true / np.max(weights_true)
-                    #else:
-                    #    linewidths_true = 1
-                    #pos = nx.spring_layout(G_true, seed=42)  # You might need to adjust the layout algorithm
-                    #nx.draw(G_true, pos, width=linewidths_true, with_labels=False, node_size=30, arrowsize=10)
-                    #plt.title('True D1 Network')
-                    #plt.subplot(1, 2, 2)
-                    #G_est = nx.DiGraph(D1_em_final)
-                    #weights_est = np.array([abs(G_est[u][v]['weight']) for u, v in G_est.edges()])
-                    #if weights_est.size > 0:
-                    #    linewidths_est = 5 * weights_est / np.max(weights_est)
-                    #else:
-                    #    linewidths_est = 1
-                    #nx.draw(G_est, pos, width=linewidths_est, with_labels=False, node_size=30, arrowsize=10)
-                    #plt.title('Estimated D1 Network')
-                    #plt.tight_layout()
-                    #plt.show()
-
                     precision[real] = TP / (TP + FP + 1e-8)
                     recall[real] = TP / (TP + FN + 1e-8)
                     specificity[real] = TN / (TN + FP + 1e-8)
@@ -254,32 +231,21 @@ for param in range(len(lambda_reg)):
                     F1score[real] = 2 * TP / (2 * TP + FP + FN + 1e-8)
                     RMSE_results.append(RMSE[real])
 
-                    print(f"Final error on D1 = {RMSE[real]:.4f}")
-                    print(f"accuracy = {accuracy[real]:.4f}; precision = {precision[real]:.4f}; recall = {recall[real]:.4f}; specificity = {specificity[real]:.4f}")
-
-                print(f"Total time = {np.mean(tEnd):.4f}")
-
-                print(f"average RMSE = {np.nanmean(RMSE):.4f}")
-                print(f"average accuracy = {np.nanmean(accuracy):.4f}")
-                print(f"average precision = {np.nanmean(precision):.4f}")
-                print(f"average recall = {np.nanmean(recall):.4f}")
-                print(f"average specificity = {np.nanmean(specificity):.4f}")
-                print(f"average F1 score = {np.nanmean(F1score):.4f}")
         meanRMSE[param][nodex] = np.mean(RMSE_results)
         RMSE_results = []
 meanRMSE = np.array(meanRMSE)
 print(meanRMSE)
-for j, lam in enumerate(lambda_reg):
+for j, lam in enumerate(alpha):
     plt.plot(
         nodes_size,           
-        meanRMSE[:, j],       
+        meanRMSE[j, :],       
         marker='o',
-        label=f'$\lambda$ = {lam}'
+        label=f'alpha = {lam}'
     )
 
 plt.xlabel('Number of nodes')
 plt.ylabel('Mean RMSE')
-plt.title('Mean RMSE vs Node Count for different $\lambda$')
+plt.title('Mean RMSE vs Node Count for different alpha')
 plt.grid(True)
 plt.legend()
 plt.tight_layout()
