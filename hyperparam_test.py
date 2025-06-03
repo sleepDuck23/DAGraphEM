@@ -21,7 +21,7 @@ At each run we will test a chosen parameter with multiple graphs and increasing 
 The result of this file should be a series of plots to analyze the behavior of such parameter
 """
 hyperparam = [10,20,50,75,100]
-nodes_size = [4,6,8,10,15]
+nodes_size = [6,8,10,15,20]
 random_seed = [40,41,42,43,44]
 RMSE_results = []
 meanRMSE = [ [ 0 for i in range(len(nodes_size)) ] for j in range(len(hyperparam)) ] 
@@ -69,8 +69,8 @@ for param in range(len(hyperparam)):
                 reg1 = 113
                 gamma1 = 20
                 num_adam_steps = 1000
-                #lambda_reg = 50 #Being tested as study parameter
-                alpha = 50 
+                lambda_reg = 50 
+                #alpha = 50 
                 stepsize = 0.1
 
                 reg = {}
@@ -183,7 +183,7 @@ for param in range(len(hyperparam)):
                             Phi_torch = numpy_to_torch(Phi)
 
                             optimizer.zero_grad()
-                            loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,hyperparam[param],alpha)
+                            loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,hyperparam[param])
                             if not torch.isfinite(loss):
                                 print("Non-finite loss encountered")
                                 break
@@ -240,12 +240,12 @@ for j, lam in enumerate(hyperparam):
         nodes_size,           
         meanRMSE[j, :],       
         marker='o',
-        label=f'lambda = {lam}'
+        label=f'alpha = {lam}'
     )
 
 plt.xlabel('Number of nodes')
 plt.ylabel('Mean RMSE')
-plt.title('Mean RMSE vs Node Count for different lambda')
+plt.title('Mean RMSE vs Node Count for different alpha')
 plt.grid(True)
 plt.legend()
 plt.tight_layout()

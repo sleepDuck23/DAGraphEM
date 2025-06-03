@@ -34,3 +34,20 @@ def compute_loss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5):
     #h = torch.trace(torch.linalg.matrix_exp(A*A)) - A.shape[0]
 
     return f1 + f2 + h 
+
+def compute_new_loss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-6):
+    # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))
+    CA_T = C @ A.T
+    AC_T = A @ C.T
+    APhiA_T = A @ Phi @ A.T
+    inside = Sigma - CA_T - AC_T + APhiA_T
+    f1 = 0.5 * K * torch.trace(Q @ inside)
+
+    # L1 norm
+    f2 = lambda_reg * torch.sum(torch.sqrt(A**2 + delta**2))
+
+    # logdet penalty
+    h = -alpha * logdet_dag(A)
+    #h = torch.trace(torch.linalg.matrix_exp(A*A)) - A.shape[0]
+
+    return f1 + f2 + h 

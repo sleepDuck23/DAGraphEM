@@ -18,19 +18,6 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
 if __name__ == "__main__":
     K = 2000  # length of time series
     flag_plot = 1
-
-    ## Load ground truth matrix D1
-    #try:
-    #    data = scipy.io.loadmat('dataset/D1_datasetA_icassp.mat')
-    #    D1 = data['D1']
-    #except FileNotFoundError:
-    #    print("Error: datasets/D1_datasetA_icassp.mat not found. Using a dummy D1.")
-    #    Nx = 15  # Dummy size
-    #    D1 = prox_stable(np.random.rand(Nx, Nx) - 0.5, 1)
-    #Nx = D1.shape[0]  # number of nodes
-    #Nz = Nx
-    #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
-
     #Lets try new things: let's generate a DAG and use it on yhe following
     D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
@@ -51,10 +38,11 @@ if __name__ == "__main__":
 
     reg1 = 113
     gamma1 = 20
-    num_adam_steps = 1000
+    num_lbfgs_steps = 1 # Adjust number of L-BFGS steps as needed
     lambda_reg = 50
     alpha = 50
-    stepsize = 0.1
+    stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
+    
 
     reg = {}
     reg['reg1'] = reg1
@@ -105,7 +93,7 @@ if __name__ == "__main__":
 
         for i in range(Nit_em):  # EM iterations
             # Just for visualization purposes
-            if i % 10 == 0:
+            if i % 1 == 0:
                     print(f"EM Step {i}")
             
             # 1/ Kalman filter filter
@@ -145,66 +133,47 @@ if __name__ == "__main__":
             for k in range(K - 2, -1, -1):
                 z_mean_smooth_em[:, k], P_smooth_em[:, :, k], G_smooth_em[:, :, k] = \
                     Smoothing_update(z_mean_kalman_em[:, k], P_kalman_em[:, :, k],
-                                     z_mean_smooth_em[:, k + 1], P_smooth_em[:, :, k + 1], D1_em, D2, R, Q)     
+                                     z_mean_smooth_em[:, k + 1], P_smooth_em[:, :, k + 1], D1_em, D2, R, Q)    
             z_mean_smooth0_em, P_smooth0_em, G_smooth0_em = \
                 Smoothing_update(z0, P0, z_mean_smooth_em[:, 0].reshape(-1, 1), P_smooth_em[:, :, 0], D1_em, D2, R, Q)
 
 
             # compute EM parameters
             Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
-                                                z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
+                                                 z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
             
-            #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
+            # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
             A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-            optimizer = torch.optim.Adam([A], lr=1e-4)
+            # L-BFGS optimizer
+            optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps)
 
-            for step in range(num_adam_steps):
-                #Sigma_scaled = Sigma / np.linalg.norm(Sigma, 'fro')
-                #C_scaled = C / np.linalg.norm(C, 'fro')
-                #Phi_scaled = Phi / np.linalg.norm(Phi, 'fro')
-
-                # Convert all to PyTorch tensors
+            def closure():
+                optimizer.zero_grad()
                 Sigma_torch = numpy_to_torch(Sigma)
                 C_torch = numpy_to_torch(C)
                 Phi_torch = numpy_to_torch(Phi)
-
-                optimizer.zero_grad()
-                loss = compute_new_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
+                loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, lambda_reg, alpha)
                 if not torch.isfinite(loss):
-                    print("Non-finite loss encountered")
-                    break
+                    print("Non-finite loss encountered in closure")
+                    return loss
                 loss.backward()
-                #torch.nn.utils.clip_grad_norm_([A], max_norm=10.0)
-                optimizer.step()
-                if step % 250 == 0 and i % 10 == 0:
-                    print(f"Adam Step {step}, Loss: {loss.item():.2f}")
-                    grad_norm = A.grad.norm().item()
-                    print(f"Grad norm: {grad_norm:.2f}")
+                return loss
 
-            D1_em = A.detach().cpu().numpy()
             
-            #Below is the older implementation using MM-Douglas-Rachford method
 
-            ## compute majorant function for ML term before update
-            #Maj_before[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em, D2, Sigma, Phi, B, C, D, K)
-            #Maj_before[i] = Maj_before[i] + Reg_before  # add prior term (= majorant for MAP term)
+            for step in range(num_lbfgs_steps):
+                optimizer.step(closure)
 
-            ## 3/ EM Update
-            #Maj_D1_before = ComputeMaj_D1(sigma_Q, D1_em, Sigma, Phi, C, K) + Reg_before
-            #D1_em_ = GRAPHEM_update(Sigma, Phi, C, K, sigma_Q, reg, D1_em, Maj_D1_before)
-
-            ## compute majorant function for ML term after update (to check decrease)
-            #Maj_after[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em_, D2, Sigma, Phi, B, C, D, K)
-            ## add penalty function after update
-            #Reg_after = Compute_Prior_D1(D1_em_, reg)
-            #Maj_after[i] = Maj_after[i] + Reg_after
+            
+            D1_em = A.detach().cpu().numpy()
 
             #D1_em = D1_em_  # D1 estimate updated
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
-            charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+            # Ensure the input to expm is a 2D array and trace operates correctly
+            charac_dag.append(np.trace(expm(D1_em @ D1_em.T)) - D1_em.shape[0])
 
 
             if i > 0:
