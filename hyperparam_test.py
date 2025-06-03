@@ -20,14 +20,14 @@ The goal of this file is to understand the behavior of each hyper-parameter in t
 At each run we will test a chosen parameter with multiple graphs and increasing the number of nodes
 The result of this file should be a series of plots to analyze the behavior of such parameter
 """
-alpha = [25,50]
-nodes_size = [4,6,8,10]
-random_seed = [40,41]
+hyperparam = [10,20,50,75,100]
+nodes_size = [4,6,8,10,15]
+random_seed = [40,41,42,43,44]
 RMSE_results = []
-meanRMSE = [ [ 0 for i in range(len(nodes_size)) ] for j in range(len(alpha)) ] 
+meanRMSE = [ [ 0 for i in range(len(nodes_size)) ] for j in range(len(hyperparam)) ] 
 
-for param in range(len(alpha)):
-    print(f"-------------------- Alpha: {alpha[param]} --------------------")
+for param in range(len(hyperparam)):
+    print(f"-------------------- hyperparam: {hyperparam[param]} --------------------")
     for nodex in range(len(nodes_size)):
         print(f"------------ Nodes: {nodes_size[nodex]} ------------")
         for seeds in random_seed:
@@ -69,8 +69,8 @@ for param in range(len(alpha)):
                 reg1 = 113
                 gamma1 = 20
                 num_adam_steps = 1000
-                lambda_reg = 50 
-                #alpha = 50 #Being tested as study parameter
+                #lambda_reg = 50 #Being tested as study parameter
+                alpha = 50 
                 stepsize = 0.1
 
                 reg = {}
@@ -183,7 +183,7 @@ for param in range(len(alpha)):
                             Phi_torch = numpy_to_torch(Phi)
 
                             optimizer.zero_grad()
-                            loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha[param])
+                            loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,hyperparam[param],alpha)
                             if not torch.isfinite(loss):
                                 print("Non-finite loss encountered")
                                 break
@@ -235,17 +235,17 @@ for param in range(len(alpha)):
         RMSE_results = []
 meanRMSE = np.array(meanRMSE)
 print(meanRMSE)
-for j, lam in enumerate(alpha):
+for j, lam in enumerate(hyperparam):
     plt.plot(
         nodes_size,           
         meanRMSE[j, :],       
         marker='o',
-        label=f'alpha = {lam}'
+        label=f'lambda = {lam}'
     )
 
 plt.xlabel('Number of nodes')
 plt.ylabel('Mean RMSE')
-plt.title('Mean RMSE vs Node Count for different alpha')
+plt.title('Mean RMSE vs Node Count for different lambda')
 plt.grid(True)
 plt.legend()
 plt.tight_layout()
