@@ -19,7 +19,7 @@ if __name__ == "__main__":
     K = 2000  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     reg1 = 113
     gamma1 = 20
-    num_lbfgs_steps = 1 # Adjust number of L-BFGS steps as needed
+    num_lbfgs_steps = 10 # Adjust number of L-BFGS steps as needed
     lambda_reg = 50
     alpha = 50
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
@@ -75,8 +75,9 @@ if __name__ == "__main__":
 
         Err_D1 = []
         charac_dag = []
+        stop_crit = []
         Nit_em = 50  # number of iterations maximum for EM loop
-        prec = 1e-2  # precision for EM loop
+        prec = 25e-3  # precision for EM loop
         w_threshold = 0.1
 
         tStart = time.perf_counter() 
@@ -145,7 +146,7 @@ if __name__ == "__main__":
             # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
             A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
             # L-BFGS optimizer
-            optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps)
+            optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=20)
 
             def closure():
                 optimizer.zero_grad()
@@ -173,7 +174,10 @@ if __name__ == "__main__":
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
             # Ensure the input to expm is a 2D array and trace operates correctly
-            charac_dag.append(np.trace(expm(D1_em @ D1_em.T)) - D1_em.shape[0])
+            charac_dag.append(np.trace(expm(D1_em * D1_em)) - D1_em.shape[0])
+
+            stop_crit.append(np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
+                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro'))
 
 
             if i > 0:
@@ -273,5 +277,13 @@ if __name__ == "__main__":
         plt.title('DAG characterization of A')
         plt.xlabel('GRAPHEM iterations')
         plt.ylabel('Characterization')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(6)
+        plt.semilogy(stop_crit)
+        plt.title('Stop criterion')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('Loss')
         plt.grid(True)
         plt.show()
