@@ -19,7 +19,7 @@ if __name__ == "__main__":
     K = 2000  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(50, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -146,7 +146,7 @@ if __name__ == "__main__":
             # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
             A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
             # L-BFGS optimizer
-            optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=20)
+            optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=50)
 
             def closure():
                 optimizer.zero_grad()
