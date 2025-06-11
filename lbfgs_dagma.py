@@ -77,8 +77,9 @@ if __name__ == "__main__":
         charac_dag = []
         stop_crit = []
         Nit_em = 50  # number of iterations maximum for EM loop
-        prec = 25e-3  # precision for EM loop
-        w_threshold = 0.1
+        prec = 1e-4  # precision for EM loop
+        precDAG = 1e-3
+        w_threshold = 1e-1
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
@@ -182,7 +183,7 @@ if __name__ == "__main__":
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < prec:
+                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < precDAG:
                     print(f"EM converged after iteration {i + 1}")
                     break
 
@@ -193,6 +194,8 @@ if __name__ == "__main__":
 
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
+
+        TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
 
         threshold = 1e-10
         D1_binary = np.abs(D1) >= threshold
@@ -241,6 +244,7 @@ if __name__ == "__main__":
     print(f"average recall = {np.nanmean(recall):.4f}")
     print(f"average specificity = {np.nanmean(specificity):.4f}")
     print(f"average F1 score = {np.nanmean(F1score):.4f}")
+    print(f"Is it a DAG = {nx.is_directed_acyclic_graph(TestDAG)}")
 
     if flag_plot == 1:
         plt.figure()

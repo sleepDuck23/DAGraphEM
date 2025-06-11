@@ -19,7 +19,7 @@ if __name__ == "__main__":
     K = 2000  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(50, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -40,8 +40,8 @@ if __name__ == "__main__":
     gamma1 = 20
     num_lbfgs_steps = 10 # Adjust number of L-BFGS steps as needed
     lambda_reg = 50
-    alpha = 1
-    stepsize = 0.9 # This stepsize is not directly used by L-BFGS, but can be for other parts.
+    alpha = 10
+    stepsize = 0.5 # This stepsize is not directly used by L-BFGS, but can be for other parts.
     
 
     reg = {}
@@ -77,8 +77,9 @@ if __name__ == "__main__":
         charac_dag = []
         stop_crit = []
         Nit_em = 50  # number of iterations maximum for EM loop
-        prec = 25e-3  # precision for EM loop
-        w_threshold = 0.1
+        prec = 1e-3  # precision for EM loop
+        precDAG = 5e-4
+        w_threshold = 1e-3
         alpha_factor = 0.1
 
         tStart = time.perf_counter() 
@@ -147,7 +148,7 @@ if __name__ == "__main__":
             # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
             A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
             # L-BFGS optimizer
-            optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=50)
+            optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=5)
 
             def closure():
                 optimizer.zero_grad()
@@ -185,17 +186,23 @@ if __name__ == "__main__":
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < prec:
+                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < precDAG:
                     print(f"EM converged after iteration {i + 1}")
                     break
 
 
         tEnd[real] = time.perf_counter() - tStart
 
+        print(D1_em)
+
         D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
 
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
+
+        print(D1_em_final)
+
+        TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
 
         threshold = 1e-10
         D1_binary = np.abs(D1) >= threshold
@@ -244,6 +251,7 @@ if __name__ == "__main__":
     print(f"average recall = {np.nanmean(recall):.4f}")
     print(f"average specificity = {np.nanmean(specificity):.4f}")
     print(f"average F1 score = {np.nanmean(F1score):.4f}")
+    print(f"Is it a DAG = {nx.is_directed_acyclic_graph(TestDAG)}")
 
     if flag_plot == 1:
         plt.figure()
