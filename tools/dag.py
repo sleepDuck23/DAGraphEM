@@ -51,3 +51,27 @@ def compute_new_loss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     #h = torch.trace(torch.linalg.matrix_exp(A*A)) - A.shape[0]
 
     return f1 + f2 + h 
+
+def pipa_f1_h_loss(A,K,Q,Sigma,C,Phi,alpha=0.5):
+    # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))
+    CA_T = C @ A.T
+    AC_T = A @ C.T
+    APhiA_T = A @ Phi @ A.T
+    inside = Sigma - CA_T - AC_T + APhiA_T
+    f1 = 0.5 * K * torch.trace(Q @ inside)
+
+    # logdet penalty
+    h = -alpha * logdet_dag(A)
+    #h = torch.trace(torch.linalg.matrix_exp(A*A)) - A.shape[0]
+
+    return f1 + h 
+
+def pipa_f1_h_grad(A,K,Q,Sigma,C,Phi,alpha=0.5):
+    
+    f1_g = 0.5 * K * (-2*Q @ C + (Q @ A @ Phi.T + Q @ A @ Phi))
+
+    M = torch.eye(A[0]) - A*A
+    h_grad = 2 * M * torch.linalg.inv(M).T
+    
+
+    return f1_g + h_grad
