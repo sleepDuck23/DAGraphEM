@@ -42,13 +42,9 @@ def gradient_A_sig(grad_A_sig_in, A, H, Pk_minus, Kk):
   Lk = A - Jk @ H
   Nx = A.shape[0]  # Get the number of rows of A
 
-  # MATLAB: Kom = commutation_matrix(Nx,Nx);
   Kom = comutmatrix(Nx, Nx)
 
-  # MATLAB: Nm = (eye(Nx^2)+Kom)./2;
   Nm = (np.eye(Nx**2) + Kom) / 2
-
-  # MATLAB: grad_A_sig_new = grad_A_sig*kron(Lk',Lk') + 2*kron(Pk_minus*Lk',eye(Nx))*Nm;
 
   term1 = grad_A_sig_in @ np.kron(Lk.T, Lk.T)
 
@@ -99,13 +95,10 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K, var):
         x[:, 0], z0, P0, A, H, R, Q)
 
     grad_A_phik[:, 0] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], grad_A_sig)
-    grad_Q_phik[:, 0] = gradient_Q_phik(grad_Q_mu, H, yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], grad_Q_sig)
+    
 
-    grad_A_mu = gradient_A_mu_update(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, 0], yk_kalman_em[:, 0], Kk[:, :, 0], z_mean_kalman_em[:, 0])
-    grad_A_sig = gradient_A_sig_update(grad_A_sig, A, H, Pk_minus[:, :, 0], Kk[:, :, 0])
-
-    grad_Q_mu = gradient_Q_mu_update(grad_Q_mu, grad_Q_sig, A, H, Sk_kalman_em[:, :, 0], yk_kalman_em[:, 0], Kk[:, :, 0])
-    grad_Q_sig = gradient_Q_sig_update(grad_Q_sig, A, H, Kk[:, :, 0])
+    grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, 0], yk_kalman_em[:, 0], Kk[:, :, 0], z_mean_kalman_em[:, 0])
+    grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, 0], Kk[:, :, 0])
 
     # Loop over time steps
     for k in range(1, K):
@@ -113,13 +106,12 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K, var):
             x[:, k], z_mean_kalman_em[:, k-1], P_kalman_em[:, :, k-1], A, H, R, Q)
 
         grad_A_phik[:, k] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, k], Sk_kalman_em[:, :, k], grad_A_sig)
-        grad_Q_phik[:, k] = gradient_Q_phik(grad_Q_mu, H, yk_kalman_em[:, k], Sk_kalman_em[:, :, k], grad_Q_sig)
+        
 
-        grad_A_mu = gradient_A_mu_update(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, k], yk_kalman_em[:, k], Kk[:, :, k], z_mean_kalman_em[:, k])
-        grad_A_sig = gradient_A_sig_update(grad_A_sig, A, H, Pk_minus[:, :, k], Kk[:, :, k])
+        grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, k], yk_kalman_em[:, k], Kk[:, :, k], z_mean_kalman_em[:, k])
+        grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, k], Kk[:, :, k])
 
-        grad_Q_mu = gradient_Q_mu_update(grad_Q_mu, grad_Q_sig, A, H, Sk_kalman_em[:, :, k], yk_kalman_em[:, k], Kk[:, :, k])
-        grad_Q_sig = gradient_Q_sig_update(grad_Q_sig, A, H, Kk[:, :, k])
+        
 
     phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
 
