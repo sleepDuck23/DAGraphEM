@@ -32,7 +32,7 @@ if __name__ == "__main__":
     #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(50, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(30, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     reg1 = 113
     gamma1 = 20
     num_adam_steps = 1000
-    lambda_reg = 50
+    lambda_reg = 0
     alpha = 1
     stepsize = 0.1
 
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         charac_dag = []
         Nit_em = 50  # number of iterations maximum for EM loop
         prec = 1e-2  # precision for EM loop
-        w_threshold = 0.1
+        w_threshold = 0.05
         factor_alpha = 0.5
 
         tStart = time.perf_counter() 
