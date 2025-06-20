@@ -2,6 +2,7 @@ import numpy as np
 
 from gradientEM import comutmatrix
 from tools.EM import Kalman_update
+from tools.loss import Compute_PhiK
 
 def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
   Sk_inv = np.linalg.pinv(Sk)
@@ -120,7 +121,7 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K, var):
         grad_Q_mu = gradient_Q_mu_update(grad_Q_mu, grad_Q_sig, A, H, Sk_kalman_em[:, :, k], yk_kalman_em[:, k], Kk[:, :, k])
         grad_Q_sig = gradient_Q_sig_update(grad_Q_sig, A, H, Kk[:, :, k])
 
-    phi = compute_phi_k(0, Sk_kalman_em, yk_kalman_em)
+    phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
 
     dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx))
     dphiQ = -np.reshape(np.sum(grad_Q_phik, axis=1), (Nx, Nx))
