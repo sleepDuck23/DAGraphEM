@@ -15,35 +15,29 @@ from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
 from tools.dag import numpy_to_torch, logdet_dag, compute_loss
 
-# Experiment settings
-#hyperparam = [0.25, 0.5, 0.75, 1]
-#nodes_size = [5,10,15,20]
-#random_seed = [40,41,42,43,44,45,46,47,48,49]
-
-hyperparam = [0.25, 0.5]
-nodes_size = [3,4,5]
-random_seed = [40,41]
-
-# Store RMSEs as: results[alpha_idx][nodes_idx] = list of RMSEs over seeds
-all_RMSE = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
-all_accuracy = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
-all_time = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
-all_f1 = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
-all_DAG = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
-
-tEnd = np.zeros(len(random_seed))
-RMSE = np.zeros(len(random_seed))
-accuracy = np.zeros(len(random_seed))
-F1score = np.zeros(len(random_seed))
 
 
-for param in range(len(hyperparam)):
-    print(f"-------------------- hyperparam: {hyperparam[param]} --------------------")
-    for nodex in range(len(nodes_size)):
-        print(f"------------ Nodes: {nodes_size[nodex]} ------------")
-        for seeds in random_seed:
-            print(f"---- Seed: {seeds} ----")
-            if __name__ == "__main__":
+if __name__ == "__main__":
+    # Experiment settings
+    hyperparam = [0.25, 0.5, 0.75, 1]
+    nodes_size = [5,10,15,20]
+    random_seed = [40,41,42,43,44,45,46,47,48,49]
+    
+    
+    # Store RMSEs as: results[alpha_idx][nodes_idx] = list of RMSEs over seeds
+    all_RMSE = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+    all_accuracy = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+    all_time = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+    all_f1 = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+    all_DAG = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+
+    for param in range(len(hyperparam)):
+        print(f"-------------------- hyperparam: {hyperparam[param]} --------------------")
+        for nodex in range(len(nodes_size)):
+            print(f"------------ Nodes: {nodes_size[nodex]} ------------")
+            for seeds in random_seed:
+                print(f"---- Seed: {seeds} ----")
+
                 K = 2000
                 flag_plot = 0
 
@@ -152,101 +146,118 @@ for param in range(len(hyperparam)):
                             print(f"EM converged after iteration {i + 1}")
                             break
 
-                tEnd[seeds] = time.perf_counter() - tStart
+                tEnd = time.perf_counter() - tStart
 
                 D1_em[np.abs(D1_em) < w_threshold] = 0
                 D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
                 D1_em_final = D1_em
-                
+
                 threshold = 1e-10
                 D1_binary = np.abs(D1) >= threshold
                 D1_em_binary = np.abs(D1_em) >= threshold
 
                 TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
                 RMSE = np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro')
-                
+
                 all_RMSE[param][nodex].append(RMSE)
 
-                accuracy[seeds] = (TP + TN) / (TP + TN + FP + FN + 1e-8)
-                RMSE[seeds] = Err_D1[-1] if Err_D1 else np.nan
-                F1score[seeds] = 2 * TP / (2 * TP + FP + FN + 1e-8)
+                accuracy = (TP + TN) / (TP + TN + FP + FN + 1e-8)
+                RMSE = Err_D1[-1] if Err_D1 else np.nan
+                F1score = 2 * TP / (2 * TP + FP + FN + 1e-8)
 
-                all_accuracy[param][nodex].append(accuracy[0])
-                all_f1[param][nodex].append(F1score[0])
+                all_accuracy[param][nodex].append(accuracy)
+                all_f1[param][nodex].append(F1score)
                 all_time[param][nodex].append(tEnd)
 
                 TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
-                all_DAG[param][nodex].append(nx.is_directed_acyclic_graph(TestDAG))
+                all_DAG[param][nodex].append(int(nx.is_directed_acyclic_graph(TestDAG)))
 
-# Plotting RMSE using boxplots
-import seaborn as sns
-import matplotlib.pyplot as plt
+    # Plotting RMSE using boxplots
+    import seaborn as sns
+    import matplotlib.pyplot as plt
 
-for j in range(len(hyperparam)):
-    data = all_RMSE[j]
-    
-    plt.figure(figsize=(8, 6))
-    plt.boxplot(data, positions=range(len(nodes_size)), patch_artist=True)
-    
-    plt.title(f'Boxplot of RMSE vs Number of Nodes (lambda = {hyperparam[j]})')
-    plt.xticks(range(len(nodes_size)), nodes_size)
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("RMSE")
-    plt.grid(True, linestyle='--', alpha=0.7)
-    
-    plt.tight_layout()
-    plt.savefig(f"rmse_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
-    
-    plt.show()
+    for j in range(len(hyperparam)):
+        data = all_RMSE[j]
+
+        plt.figure(figsize=(8, 6))
+        plt.boxplot(data, positions=range(len(nodes_size)), patch_artist=True)
+
+        plt.title(f'Boxplot of RMSE vs Number of Nodes (lambda = {hyperparam[j]})')
+        plt.xticks(range(len(nodes_size)), nodes_size)
+        plt.xlabel("Number of Nodes")
+        plt.ylabel("RMSE")
+        plt.grid(True, linestyle='--', alpha=0.7)
+
+        plt.tight_layout()
+        plt.savefig(f"rmse_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+
+        plt.show()
 
 
-for j in range(len(hyperparam)):
-    data = all_accuracy[j]
-    
-    plt.figure(figsize=(8, 6))
-    plt.boxplot(data, positions=range(len(nodes_size)), patch_artist=True)
-    
-    plt.title(f'Boxplot of Accuracy vs Number of Nodes (lambda = {hyperparam[j]})')
-    plt.xticks(range(len(nodes_size)), nodes_size)
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("Accuracy")
-    plt.grid(True, linestyle='--', alpha=0.7)
-    
-    plt.tight_layout()
-    plt.savefig(f"acc_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
-    
-    plt.show()
+    for j in range(len(hyperparam)):
+        data = all_accuracy[j]
 
-for j in range(len(hyperparam)):
-    data = all_f1[j]
-    
-    plt.figure(figsize=(8, 6))
-    plt.boxplot(data, positions=range(len(nodes_size)), patch_artist=True)
-    
-    plt.title(f'Boxplot of F1 Score vs Number of Nodes (lambda = {hyperparam[j]})')
-    plt.xticks(range(len(nodes_size)), nodes_size)
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("F1 Score")
-    plt.grid(True, linestyle='--', alpha=0.7)
-    
-    plt.tight_layout()
-    plt.savefig(f"f1_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
-    
-    plt.show()
+        plt.figure(figsize=(8, 6))
+        plt.boxplot(data, positions=range(len(nodes_size)), patch_artist=True)
 
-for j in range(len(hyperparam)):
-    data = all_time[j]
-    
-    plt.figure(figsize=(8, 6))
-    plt.boxplot(data, positions=range(len(nodes_size)), patch_artist=True)
-    
-    plt.title(f'Boxplot of Comp. Time vs Number of Nodes (lambda = {hyperparam[j]})')
-    plt.xticks(range(len(nodes_size)), nodes_size)
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("Comp. Time")
-    plt.grid(True, linestyle='--', alpha=0.7)
-    
-    plt.tight_layout()
-    plt.savefig(f"time_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
-    
-    plt.show()
+        plt.title(f'Boxplot of Accuracy vs Number of Nodes (lambda = {hyperparam[j]})')
+        plt.xticks(range(len(nodes_size)), nodes_size)
+        plt.xlabel("Number of Nodes")
+        plt.ylabel("Accuracy")
+        plt.grid(True, linestyle='--', alpha=0.7)
+
+        plt.tight_layout()
+        plt.savefig(f"acc_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+
+        plt.show()
+
+    for j in range(len(hyperparam)):
+        data = all_f1[j]
+
+        plt.figure(figsize=(8, 6))
+        plt.boxplot(data, positions=range(len(nodes_size)), patch_artist=True)
+
+        plt.title(f'Boxplot of F1 Score vs Number of Nodes (lambda = {hyperparam[j]})')
+        plt.xticks(range(len(nodes_size)), nodes_size)
+        plt.xlabel("Number of Nodes")
+        plt.ylabel("F1 Score")
+        plt.grid(True, linestyle='--', alpha=0.7)
+
+        plt.tight_layout()
+        plt.savefig(f"f1_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+
+        plt.show()
+
+    for j in range(len(hyperparam)):
+        data = all_time[j]
+
+        plt.figure(figsize=(8, 6))
+        plt.boxplot(data, positions=range(len(nodes_size)), patch_artist=True)
+
+        plt.title(f'Boxplot of Comp. Time vs Number of Nodes (lambda = {hyperparam[j]})')
+        plt.xticks(range(len(nodes_size)), nodes_size)
+        plt.xlabel("Number of Nodes")
+        plt.ylabel("Comp. Time")
+        plt.grid(True, linestyle='--', alpha=0.7)
+
+        plt.tight_layout()
+        plt.savefig(f"time_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+
+        plt.show()
+
+    for j in range(len(hyperparam)):
+        data = all_DAG[j]
+
+        plt.figure(figsize=(8, 6))
+        plt.boxplot(data, positions=range(len(nodes_size)), patch_artist=True)
+
+        plt.title(f'Boxplot of is DAG or not vs Number of Nodes (lambda = {hyperparam[j]})')
+        plt.xticks(range(len(nodes_size)), nodes_size)
+        plt.xlabel("Number of Nodes")
+        plt.ylabel("DAG")
+        plt.grid(True, linestyle='--', alpha=0.7)
+
+        plt.tight_layout()
+        plt.savefig(f"dag_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+
+        plt.show()
