@@ -70,7 +70,7 @@ def gradient_A_phik(grad_A_mu, H, vk, Sk, grad_A_sig):
     
     return grad_A_phik
 
-def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K, var):
+def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K):
     Kom = comutmatrix(Nx, Nx)
     Nm = (np.eye(Nx**2) + Kom) / 2
 
@@ -79,16 +79,15 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K, var):
     P_kalman_em = np.zeros((Nz, Nz, K))
     yk_kalman_em = np.zeros((Nx, K))
     Sk_kalman_em = np.zeros((Nx, Nx, K))
+
+
+
     Pk_minus = np.zeros((Nx, Nx, K))
     Kk = np.zeros((Nx, Nz, K))
 
     grad_A_mu = np.kron(z0, np.eye(Nx))
     grad_A_sig = 2 * np.kron(P0 @ A.T, np.eye(Nx)) @ Nm
     grad_A_phik = np.zeros((Nx**2, K))
-
-    grad_Q_mu = np.zeros((Nx**2, Nx))
-    grad_Q_sig = np.eye(Nx**2)
-    grad_Q_phik = np.zeros((Nx**2, K))
 
     # First step
     z_mean_kalman_em[:, 0], P_kalman_em[:, :, 0], yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], Pk_minus[:, :, 0], Kk[:, :, 0] = Kalman_update(
@@ -116,14 +115,8 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K, var):
     phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
 
     dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx))
-    dphiQ = -np.reshape(np.sum(grad_Q_phik, axis=1), (Nx, Nx))
-
-    if np.all(var == [1, 1]):
-        dphi = np.concatenate([dphiA.flatten(), dphiQ.flatten()])
-    elif np.all(var == [1, 0]):
-        dphi = dphiA.flatten()
-    elif np.all(var == [0, 1]):
-        dphi = dphiQ.flatten()
+  
+    dphi = dphiA.flatten()
 
     print('+')
-    return phi, dphi, dphiA, dphiQ
+    return phi, dphi, dphiA
