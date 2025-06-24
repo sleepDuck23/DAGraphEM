@@ -7,6 +7,7 @@ import time
 import networkx as nx
 import torch
 from scipy.linalg import expm
+import pandas as pd
 
 from tools.matrix import calError
 from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
@@ -20,7 +21,7 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss
 if __name__ == "__main__":
     print("Begining computation:")
     # Experiment settings
-    hyperparam = [0.5, 1, 10, 20, 50]
+    hyperparam = [0.5, 1, 10]
     nodes_size = [5,10,15,20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -194,7 +195,7 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"images\rmse_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"rmse_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
 
@@ -212,7 +213,7 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"images\acc_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"acc_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
 
@@ -229,7 +230,7 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"images\f1_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"f1_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
 
@@ -246,7 +247,7 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"images\time_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"time_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
 
@@ -263,6 +264,35 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"images\dag_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"dag_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
+
+    
+
+    # Prepare a list of dictionaries for DataFrame rows
+    results_list = []
+
+    for i, lambda_val in enumerate(hyperparam):
+        for j, n_nodes in enumerate(nodes_size):
+            for k, seed_idx in enumerate(random_seed):
+                result_dict = {
+                    "lambda": lambda_val,
+                    "nodes_size": n_nodes,
+                    "seed": seed_idx,
+                    "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
+                    "Accuracy": all_accuracy[i][j][k] if k < len(all_accuracy[i][j]) else None,
+                    "F1": all_f1[i][j][k] if k < len(all_f1[i][j]) else None,
+                    "Time": all_time[i][j][k] if k < len(all_time[i][j]) else None,
+                    "Is_DAG": all_DAG[i][j][k] if k < len(all_DAG[i][j]) else None
+                }
+                results_list.append(result_dict)
+
+    # Convert to DataFrame
+    results_df = pd.DataFrame(results_list)
+
+    # Save to CSV
+    csv_path = "GRAPHEM_experiment_results.csv"
+    results_df.to_csv(csv_path, index=False)
+
+    print(f"Results saved to {csv_path}")
