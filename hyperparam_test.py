@@ -18,10 +18,15 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss
 
 
 if __name__ == "__main__":
+    print("Begining computation:")
     # Experiment settings
-    hyperparam = [0.25, 0.5, 0.75, 1]
+    hyperparam = [0.5, 1, 10, 20, 50]
     nodes_size = [5,10,15,20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
+
+    print(f"Defined Hyperparameter values: {hyperparam}")
+    print(f"Defined node sizes: {nodes_size}")
+    print(f"Defined random seeds: {random_seed}")
     
     
     # Store RMSEs as: results[alpha_idx][nodes_idx] = list of RMSEs over seeds
@@ -189,7 +194,7 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"rmse_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"images\rmse_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
 
@@ -207,7 +212,7 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"acc_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"images\acc_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
 
@@ -224,7 +229,7 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"f1_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"images\f1_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
 
@@ -241,7 +246,7 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"time_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"images\time_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
 
@@ -258,6 +263,6 @@ if __name__ == "__main__":
         plt.grid(True, linestyle='--', alpha=0.7)
 
         plt.tight_layout()
-        plt.savefig(f"dag_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
+        plt.savefig(f"images\dag_boxplot_lambda_{hyperparam[j]}.png", dpi=300)
 
         plt.show()
