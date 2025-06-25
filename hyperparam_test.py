@@ -21,8 +21,8 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss
 if __name__ == "__main__":
     print("Begining computation:")
     # Experiment settings
-    hyperparam = [0.5, 1, 10]
-    nodes_size = [5,10,15,20]
+    hyperparam = [0]
+    nodes_size = [7,10,15,20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
@@ -292,7 +292,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "GRAPHEM_experiment_results.csv"
+    csv_path = "GRAPHEM_experiment_results_lambda_0.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
