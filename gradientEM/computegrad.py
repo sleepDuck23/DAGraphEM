@@ -3,6 +3,7 @@ import numpy as np
 from gradientEM import comutmatrix
 from tools.EM import Kalman_update
 from tools.loss import Compute_PhiK
+from tools.dag import grad_desc_penalty
 
 def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
   Sk_inv = np.linalg.pinv(Sk)
@@ -70,7 +71,7 @@ def gradient_A_phik(grad_A_mu, H, vk, Sk, grad_A_sig):
     
     return grad_A_phik
 
-def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K):
+def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     Kom = comutmatrix(Nx, Nx)
     Nm = (np.eye(Nx**2) + Kom) / 2
 
@@ -111,10 +112,11 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K):
         grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, k], Kk[:, :, k])
 
         
+    penalty, grad_penalty = grad_desc_penalty(A,lambda_reg,alpha,delta)
 
-    phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
+    phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em) + penalty
 
-    dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx))
+    dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx)) + grad_penalty
   
     dphi = dphiA.flatten()
 
