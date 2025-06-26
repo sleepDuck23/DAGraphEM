@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from tools.loss import ComputeMaj_D1, Compute_Prior_D1
 from tools.prox import prox_L1, prox_ML_D1, prox_stable
@@ -45,6 +46,18 @@ def Kalman_update(y_k,xk_mean_past,Pk_past,A,H,R,Q):
     Pk_new = Pk_minus - Kk @ Sk @ Kk.T
 
     return xk_mean_new, Pk_new, vk, Sk
+
+def Kalman_update_torch(y_k, xk_mean_past, Pk_past, A, H, R, Q):
+    xk_minus = A @ xk_mean_past
+    Pk_minus = A @ Pk_past @ A.T + Q
+
+    vk = y_k - H @ xk_minus
+    Sk = H @ Pk_minus @ H.T + R
+    Kk = Pk_minus @ H.T @ torch.linalg.inv(Sk)
+    xk_mean_new = xk_minus + Kk @ vk
+    Pk_new = Pk_minus - Kk @ Sk @ Kk.T
+   
+    return xk_mean_new, Pk_new, vk, Sk, Pk_minus, Kk
 
 def EM_parameters(x, z_mean_smooth, P_smooth, G_smooth, z_mean_smooth0, P_smooth0, G_smooth0):
 
