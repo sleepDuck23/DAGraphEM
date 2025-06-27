@@ -23,8 +23,8 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [0,0.5,1,10,20,50,100]
-    nodes_size = [7,10,15,20,50]
+    hyperparam = [0,0.5,1,10,20,50]
+    nodes_size = [7,10,15,20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
