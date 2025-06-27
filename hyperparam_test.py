@@ -19,10 +19,12 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss
 
 
 if __name__ == "__main__":
-    print("Begining computation:")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Using device:", device)
+
     # Experiment settings
-    hyperparam = [0]
-    nodes_size = [7,10,15,20]
+    hyperparam = [0,0.5,1,10,20,50,100]
+    nodes_size = [7,10,15,20,50]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
@@ -61,7 +63,7 @@ if __name__ == "__main__":
                 P0 = sigma_P**2 * np.eye(Nz)
                 z0 = np.ones((Nz, 1))
 
-                Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q))
+                Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q)).to(device)
 
                 reg = {'reg1': 113, 'gamma1': 20, 'Mask': (D1 != 0)}
 
@@ -127,12 +129,12 @@ if __name__ == "__main__":
                     Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                         z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
 
-                    A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
+                    A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
                     optimizer = torch.optim.Adam([A], lr=1e-4)
                     for step in range(num_adam_steps):
-                        Sigma_torch = numpy_to_torch(Sigma)
-                        C_torch = numpy_to_torch(C)
-                        Phi_torch = numpy_to_torch(Phi)
+                        Sigma_torch = numpy_to_torch(Sigma).to(device)
+                        C_torch = numpy_to_torch(C).to(device)
+                        Phi_torch = numpy_to_torch(Phi).to(device)
 
                         optimizer.zero_grad()
                         loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha)
