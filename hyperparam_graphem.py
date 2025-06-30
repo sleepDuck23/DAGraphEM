@@ -23,7 +23,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [0,0.5,1,10,20]
+    hyperparam = [10,20,50,100]
     nodes_size = [7,10,15,20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
                 Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q)).to(device)
 
-                reg = {'reg1': 113, 'gamma1': 20, 'Mask': (D1 != 0)}
+                reg = {'reg1': 113, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
 
                 saveX = np.zeros((Nx, K, 1))
 
@@ -78,13 +78,18 @@ if __name__ == "__main__":
                 D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
                 Nit_em = 50
                 prec = 1e-2
-                w_threshold = 0.1
-                num_adam_steps = 1000
-                lambda_reg = 0
-                #alpha = 50
+            
                 D1_em_save = np.zeros((Nz, Nz, Nit_em))
 
                 tStart = time.perf_counter() 
+                # initialization of GRAPHEM
+                D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
+                D1_em_save = np.zeros((Nz, Nz, Nit_em))
+                PhiK = np.zeros(Nit_em)
+                MLsave = np.zeros(Nit_em)
+                Regsave = np.zeros(Nit_em)
+                Maj_before = np.zeros(Nit_em)
+                Maj_after = np.zeros(Nit_em)
 
                 for i in range(Nit_em):
                     z_mean_kalman_em = np.zeros((Nz, K))
@@ -129,34 +134,33 @@ if __name__ == "__main__":
                     Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                         z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
 
-                    A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
-                    optimizer = torch.optim.Adam([A], lr=1e-4)
-                    for step in range(num_adam_steps):
-                        Sigma_torch = numpy_to_torch(Sigma).to(device)
-                        C_torch = numpy_to_torch(C).to(device)
-                        Phi_torch = numpy_to_torch(Phi).to(device)
+                    # compute majorant function for ML term before update
+                    Maj_before[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em, D2, Sigma, Phi, B, C, D, K)
+                    Maj_before[i] = Maj_before[i] + Reg_before  # add prior term (= majorant for MAP term)
 
-                        optimizer.zero_grad()
-                        loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, lambda_reg, hyperparam[param])
-                        if not torch.isfinite(loss): break
-                        loss.backward()
-                        optimizer.step()
+                    # 3/ EM Update
+                    Maj_D1_before = ComputeMaj_D1(sigma_Q, D1_em, Sigma, Phi, C, K) + Reg_before
+                    D1_em_ = GRAPHEM_update(Sigma, Phi, C, K, sigma_Q, reg, D1_em, Maj_D1_before)
 
-                    D1_em = A.detach().cpu().numpy()
+                    # compute majorant function for ML term after update (to check decrease)
+                    Maj_after[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em_, D2, Sigma, Phi, B, C, D, K)
+                    # add penalty function after update
+                    Reg_after = Compute_Prior_D1(D1_em_, reg)
+                    Maj_after[i] = Maj_after[i] + Reg_after
 
-                    D1_em_save[:, :, i] = D1_em
+                    D1_em = D1_em_  # D1 estimate updated
+                    D1_em_save[:, :, i] = D1_em  # keep track of the sequence
                     Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
                     charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
 
                     if i > 0:
                         if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                           np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < prec:
+                           np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec:
                             print(f"EM converged after iteration {i + 1}")
                             break
 
                 tEnd = time.perf_counter() - tStart
 
-                D1_em[np.abs(D1_em) < w_threshold] = 0
                 D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
                 D1_em_final = D1_em
 
@@ -184,11 +188,11 @@ if __name__ == "__main__":
     # Prepare a list of dictionaries for DataFrame rows
     results_list = []
 
-    for i, alpha_val in enumerate(hyperparam):
+    for i, regularizer in enumerate(hyperparam):
         for j, n_nodes in enumerate(nodes_size):
             for k, seed_idx in enumerate(random_seed):
                 result_dict = {
-                    "lambda": alpha_val,
+                    "regularizer": regularizer,
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
@@ -203,7 +207,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "GRAPHEM_experiment_results_alpha_lambda0.csv"
+    csv_path = "GRAPHEM_experiment_results_noDAG.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
