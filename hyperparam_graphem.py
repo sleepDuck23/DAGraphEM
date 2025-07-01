@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 charac_dag = []
                 D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
                 Nit_em = 50
-                prec = 1e-2
+                prec = 1e-3
             
                 D1_em_save = np.zeros((Nz, Nz, Nit_em))
 
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "GRAPHEM_experiment_results_noDAG.csv"
+    csv_path = "GRAPHEM_experiment_results_1e3.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
