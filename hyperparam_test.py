@@ -23,7 +23,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [1, 1.1, 1.25, 1.5]
+    hyperparam = [0, 0.5, 1, 10, 20]
     nodes_size = [7,10,15,20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -83,7 +83,7 @@ if __name__ == "__main__":
                 num_lbfgs_steps = 100
                 lambda_reg = 10
                 alpha = 1
-                #alpha_factor = 1.1
+                alpha_factor = 1.5
                 D1_em_save = np.zeros((Nz, Nz, Nit_em))
 
                 tStart = time.perf_counter() 
@@ -139,7 +139,7 @@ if __name__ == "__main__":
                         Phi_torch = numpy_to_torch(Phi).to(device)
 
                         optimizer.zero_grad()
-                        loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, lambda_reg, alpha)
+                        loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha)
                         if not torch.isfinite(loss): break
                         loss.backward()
                         optimizer.step()
@@ -168,7 +168,7 @@ if __name__ == "__main__":
                     #for step in range(num_lbfgs_steps):
                         #optimizer.step(closure)
 
-                    alpha *= hyperparam[param]
+                    alpha *= alpha_factor
 
 
                     D1_em = A.detach().cpu().numpy()
@@ -218,7 +218,7 @@ if __name__ == "__main__":
         for j, n_nodes in enumerate(nodes_size):
             for k, seed_idx in enumerate(random_seed):
                 result_dict = {
-                    "alpha_factor": alpha_val,
+                    "lambda": alpha_val,
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "adam_experiment_varalpha_alpha1_lambda10.csv"
+    csv_path = "adam_experiment_varalpha_alpha1_1_5.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
