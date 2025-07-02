@@ -23,7 +23,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [0,0.5,1,10,20]
+    hyperparam = [1, 1.1, 1.25, 1.5]
     nodes_size = [7,10,15,20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -83,6 +83,7 @@ if __name__ == "__main__":
                 num_lbfgs_steps = 100
                 lambda_reg = 10
                 alpha = 1
+                #alpha_factor = 1.1
                 D1_em_save = np.zeros((Nz, Nz, Nit_em))
 
                 tStart = time.perf_counter() 
@@ -130,42 +131,44 @@ if __name__ == "__main__":
                     Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                         z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
 
-                    #A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
-                    #optimizer = torch.optim.Adam([A], lr=1e-4)
-                    #for step in range(num_adam_steps):
-                    #    Sigma_torch = numpy_to_torch(Sigma).to(device)
-                    #    C_torch = numpy_to_torch(C).to(device)
-                    #    Phi_torch = numpy_to_torch(Phi).to(device)
-
-                    #    optimizer.zero_grad()
-                    #    loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, lambda_reg, hyperparam[param])
-                    #    if not torch.isfinite(loss): break
-                    #    loss.backward()
-                    #    optimizer.step()
-
-
-                    # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
                     A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
-                    # L-BFGS optimizer
-                    optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=10)
-
-                    def closure():
-                        optimizer.zero_grad()
+                    optimizer = torch.optim.Adam([A], lr=1e-4)
+                    for step in range(num_adam_steps):
                         Sigma_torch = numpy_to_torch(Sigma).to(device)
                         C_torch = numpy_to_torch(C).to(device)
                         Phi_torch = numpy_to_torch(Phi).to(device)
-                        A.data = A.data.to(device)
-                        loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, lambda_reg, hyperparam[param])
-                        if not torch.isfinite(loss):
-                            print("Non-finite loss encountered in closure")
-                            return loss
+
+                        optimizer.zero_grad()
+                        loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, lambda_reg, alpha)
+                        if not torch.isfinite(loss): break
                         loss.backward()
-                        return loss
+                        optimizer.step()
+
+
+                    # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
+                    #A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
+                    # L-BFGS optimizer
+                    #optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=10)
+
+                    #def closure():
+                        #optimizer.zero_grad()
+                        #Sigma_torch = numpy_to_torch(Sigma).to(device)
+                        #C_torch = numpy_to_torch(C).to(device)
+                        #Phi_torch = numpy_to_torch(Phi).to(device)
+                        #A.data = A.data.to(device)
+                        #loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, lambda_reg, alpha) 
+                        #if not torch.isfinite(loss):
+                            #print("Non-finite loss encountered in closure")
+                            #return loss
+                        #loss.backward()
+                        #return loss
 
             
 
-                    for step in range(num_lbfgs_steps):
-                        optimizer.step(closure)
+                    #for step in range(num_lbfgs_steps):
+                        #optimizer.step(closure)
+
+                    alpha *= hyperparam[param]
 
 
                     D1_em = A.detach().cpu().numpy()
@@ -178,6 +181,7 @@ if __name__ == "__main__":
                         if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
                            np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < prec:
                             print(f"EM converged after iteration {i + 1}")
+                            print(f"final alpha = {alpha}")
                             break
 
                 tEnd = time.perf_counter() - tStart
@@ -214,7 +218,7 @@ if __name__ == "__main__":
         for j, n_nodes in enumerate(nodes_size):
             for k, seed_idx in enumerate(random_seed):
                 result_dict = {
-                    "alpha": alpha_val,
+                    "alpha_factor": alpha_val,
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
@@ -229,7 +233,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "lbfgs_experiment_results_lambda10_mem10.csv"
+    csv_path = "adam_experiment_varalpha_alpha1_lambda10.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
