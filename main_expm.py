@@ -53,7 +53,7 @@ if __name__ == "__main__":
     gamma1 = 20
     num_adam_steps = 1000
     lambda_reg = 0
-    alpha = 1
+    alpha = 0
     stepsize = 0.1
 
     reg = {}
@@ -183,7 +183,7 @@ if __name__ == "__main__":
                     print(f"Grad norm: {grad_norm:.2f}")
 
             D1_em = A.detach().cpu().numpy()
-            alpha *= factor_alpha
+            #alpha *= factor_alpha
             
             #Below is the older implementation using MM-Douglas-Rachford method
 
@@ -218,7 +218,7 @@ if __name__ == "__main__":
 
         tEnd[real] = time.perf_counter() - tStart
 
-        D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
+        #D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
 
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em

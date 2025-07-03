@@ -23,9 +23,9 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [10,20,50,100]
-    nodes_size = [7,10,15,20]
-    random_seed = [40,41,42,43,44,45,46,47,48,49]
+    hyperparam = [0]
+    nodes_size = [10]
+    random_seed = [42]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
     print(f"Defined node sizes: {nodes_size}")
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
                 Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q)).to(device)
 
-                reg = {'reg1': 113, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
+                reg = {'reg1': 0, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
 
                 saveX = np.zeros((Nx, K, 1))
 
@@ -75,11 +75,8 @@ if __name__ == "__main__":
                 # GRAPHEM Init
                 Err_D1 = []
                 charac_dag = []
-                D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
                 Nit_em = 50
-                prec = 1e-3
-            
-                D1_em_save = np.zeros((Nz, Nz, Nit_em))
+                prec = 1e-4
 
                 tStart = time.perf_counter() 
                 # initialization of GRAPHEM
@@ -169,14 +166,14 @@ if __name__ == "__main__":
                 D1_em_binary = np.abs(D1_em) >= threshold
 
                 TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
-                RMSE = np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro')
 
-                all_RMSE[param][nodex].append(RMSE)
+                
 
                 accuracy = (TP + TN) / (TP + TN + FP + FN + 1e-8)
                 RMSE = Err_D1[-1] if Err_D1 else np.nan
                 F1score = 2 * TP / (2 * TP + FP + FN + 1e-8)
 
+                all_RMSE[param][nodex].append(RMSE)
                 all_accuracy[param][nodex].append(accuracy)
                 all_f1[param][nodex].append(F1score)
                 all_time[param][nodex].append(tEnd)
@@ -207,7 +204,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "GRAPHEM_experiment_results_1e3.csv"
+    csv_path = "test_comparison.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")

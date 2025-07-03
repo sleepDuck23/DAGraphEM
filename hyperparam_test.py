@@ -131,42 +131,42 @@ if __name__ == "__main__":
                     Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                         z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
 
-                    A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
-                    optimizer = torch.optim.Adam([A], lr=1e-4)
-                    for step in range(num_adam_steps):
-                        Sigma_torch = numpy_to_torch(Sigma).to(device)
-                        C_torch = numpy_to_torch(C).to(device)
-                        Phi_torch = numpy_to_torch(Phi).to(device)
+                    #A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
+                    #optimizer = torch.optim.Adam([A], lr=1e-4)
+                    #for step in range(num_adam_steps):
+                    #    Sigma_torch = numpy_to_torch(Sigma).to(device)
+                    #    C_torch = numpy_to_torch(C).to(device)
+                    #    Phi_torch = numpy_to_torch(Phi).to(device)
 
-                        optimizer.zero_grad()
-                        loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha)
-                        if not torch.isfinite(loss): break
-                        loss.backward()
-                        optimizer.step()
+                    #    optimizer.zero_grad()
+                    #    loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha)
+                    #    if not torch.isfinite(loss): break
+                    #    loss.backward()
+                    #    optimizer.step()
 
 
                     # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
-                    #A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
+                    A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
                     # L-BFGS optimizer
-                    #optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=10)
+                    optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=10)
 
-                    #def closure():
-                        #optimizer.zero_grad()
-                        #Sigma_torch = numpy_to_torch(Sigma).to(device)
-                        #C_torch = numpy_to_torch(C).to(device)
-                        #Phi_torch = numpy_to_torch(Phi).to(device)
-                        #A.data = A.data.to(device)
-                        #loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, lambda_reg, alpha) 
-                        #if not torch.isfinite(loss):
-                            #print("Non-finite loss encountered in closure")
-                            #return loss
-                        #loss.backward()
-                        #return loss
+                    def closure():
+                        optimizer.zero_grad()
+                        Sigma_torch = numpy_to_torch(Sigma).to(device)
+                        C_torch = numpy_to_torch(C).to(device)
+                        Phi_torch = numpy_to_torch(Phi).to(device)
+                        A.data = A.data.to(device)
+                        loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha) 
+                        if not torch.isfinite(loss):
+                            print("Non-finite loss encountered in closure")
+                            return loss
+                        loss.backward()
+                        return loss
 
             
 
-                    #for step in range(num_lbfgs_steps):
-                        #optimizer.step(closure)
+                    for step in range(num_lbfgs_steps):
+                        optimizer.step(closure)
 
                     alpha *= alpha_factor
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "adam_experiment_varalpha_alpha1_1_5.csv"
+    csv_path = "lbfgs_experiment_varalpha_alpha1_1_5.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
