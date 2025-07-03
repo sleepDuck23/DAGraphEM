@@ -88,10 +88,11 @@ if __name__ == "__main__":
 
         Err_D1 = []
         charac_dag = []
+        loss_dag = []
         Nit_em = 50  # number of iterations maximum for EM loop
         prec = 1e-2  # precision for EM loop
         w_threshold = 0.05
-        factor_alpha = 2
+        factor_alpha = 1.5
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
@@ -209,11 +210,13 @@ if __name__ == "__main__":
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+            dagness = numpy_to_torch(-alpha * logdet_dag(A))
+            loss_dag.append(dagness)
 
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < prec:
+                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and loss_dag[i] < prec:
                     print(f"EM converged after iteration {i + 1}")
                     break
 
@@ -277,6 +280,7 @@ if __name__ == "__main__":
     print(f"average specificity = {np.nanmean(specificity):.4f}")
     print(f"average F1 score = {np.nanmean(F1score):.4f}")
 
+
     if flag_plot == 1:
         plt.figure()
         plt.subplot(1, 2, 1)
@@ -310,6 +314,14 @@ if __name__ == "__main__":
         plt.figure(5)
         plt.semilogy(charac_dag)
         plt.title('DAG characterization of A')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('Characterization')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(6)
+        plt.semilogy(loss_dag)
+        plt.title('DAG loss of A')
         plt.xlabel('GRAPHEM iterations')
         plt.ylabel('Characterization')
         plt.grid(True)
