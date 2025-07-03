@@ -13,7 +13,7 @@ from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
 
 if __name__ == "__main__":
-    K = 2000  # length of time series
+    K = 100  # length of time series
     flag_plot = 1
 
     # Load ground truth matrix D1
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -43,8 +43,8 @@ if __name__ == "__main__":
     P0 = sigma_P**2 * np.eye(Nz)
     z0 = np.ones((Nz, 1))
 
-    reg1 = 0
-    gamma1 = 0
+    reg1 =1
+    gamma1 = 5
 
     reg = {}
     reg['reg1'] = reg1
@@ -171,6 +171,9 @@ if __name__ == "__main__":
         D1_binary = np.abs(D1) >= threshold
         D1_em_binary = np.abs(D1_em_final) >= threshold
         TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
+
+        TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
+        print(int(nx.is_directed_acyclic_graph(TestDAG)))
 
         plt.figure(30, figsize=(10, 5))
         plt.subplot(1, 2, 1)

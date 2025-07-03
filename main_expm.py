@@ -13,10 +13,10 @@ from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
 from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_update
 from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
-from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
+from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss, compute_loss_zero
 
 if __name__ == "__main__":
-    K = 2000  # length of time series
+    K = 100  # length of time series
     flag_plot = 1
 
     ## Load ground truth matrix D1
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(30, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -50,11 +50,12 @@ if __name__ == "__main__":
     Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q))
 
     reg1 = 113
-    gamma1 = 20
+    gamma1 = 0
     num_adam_steps = 1000
-    lambda_reg = 0
-    alpha = 0
+    lambda_reg = 5
+    alpha = 1
     stepsize = 0.1
+    
 
     reg = {}
     reg['reg1'] = reg1
@@ -90,7 +91,7 @@ if __name__ == "__main__":
         Nit_em = 50  # number of iterations maximum for EM loop
         prec = 1e-2  # precision for EM loop
         w_threshold = 0.05
-        factor_alpha = 0.5
+        factor_alpha = 2
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
@@ -170,6 +171,7 @@ if __name__ == "__main__":
                 Phi_torch = numpy_to_torch(Phi)
 
                 optimizer.zero_grad()
+                #loss = compute_loss_zero(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
                 loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
                 if not torch.isfinite(loss):
                     print("Non-finite loss encountered")
@@ -183,7 +185,7 @@ if __name__ == "__main__":
                     print(f"Grad norm: {grad_norm:.2f}")
 
             D1_em = A.detach().cpu().numpy()
-            #alpha *= factor_alpha
+            alpha *= factor_alpha
             
             #Below is the older implementation using MM-Douglas-Rachford method
 
@@ -217,6 +219,7 @@ if __name__ == "__main__":
 
 
         tEnd[real] = time.perf_counter() - tStart
+        print(f"final alpha: {alpha}")
 
         #D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
 
@@ -258,6 +261,9 @@ if __name__ == "__main__":
         accuracy[real] = (TP + TN) / (TP + TN + FP + FN + 1e-8)
         RMSE[real] = Err_D1[-1] if Err_D1 else np.nan
         F1score[real] = 2 * TP / (2 * TP + FP + FN + 1e-8)
+
+        TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
+        print(int(nx.is_directed_acyclic_graph(TestDAG)))
 
         print(f"Final error on D1 = {RMSE[real]:.4f}")
         print(f"accuracy = {accuracy[real]:.4f}; precision = {precision[real]:.4f}; recall = {recall[real]:.4f}; specificity = {specificity[real]:.4f}")

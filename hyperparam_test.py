@@ -23,9 +23,9 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [0, 0.5, 1, 10, 20]
-    nodes_size = [7,10,15,20]
-    random_seed = [40,41,42,43,44,45,46,47,48,49]
+    hyperparam = [0, 20]
+    nodes_size = [10]
+    random_seed = [40]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
     print(f"Defined node sizes: {nodes_size}")
@@ -78,12 +78,12 @@ if __name__ == "__main__":
                 D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
                 Nit_em = 50
                 prec = 1e-2
-                w_threshold = 0.1
+                w_threshold = 0.05
                 num_adam_steps = 1000
                 num_lbfgs_steps = 100
                 lambda_reg = 10
-                alpha = 1
-                alpha_factor = 1.5
+                alpha = 0
+                alpha_factor = 1
                 D1_em_save = np.zeros((Nz, Nz, Nit_em))
 
                 tStart = time.perf_counter() 
@@ -109,9 +109,9 @@ if __name__ == "__main__":
                         z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
                         yk_kalman_em[:, k] = yk_kalman_em_temp.flatten()
 
-                    PhiK = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
-                    Reg_before = Compute_Prior_D1(D1_em, reg)
-                    PhiK += Reg_before
+                    #PhiK = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
+                    #Reg_before = Compute_Prior_D1(D1_em, reg)
+                    #PhiK += Reg_before
 
                     z_mean_smooth_em = np.zeros((Nz, K))
                     P_smooth_em = np.zeros((Nz, Nz, K))
@@ -131,44 +131,44 @@ if __name__ == "__main__":
                     Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                         z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
 
-                    #A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
-                    #optimizer = torch.optim.Adam([A], lr=1e-4)
-                    #for step in range(num_adam_steps):
-                    #    Sigma_torch = numpy_to_torch(Sigma).to(device)
-                    #    C_torch = numpy_to_torch(C).to(device)
-                    #    Phi_torch = numpy_to_torch(Phi).to(device)
-
-                    #    optimizer.zero_grad()
-                    #    loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha)
-                    #    if not torch.isfinite(loss): break
-                    #    loss.backward()
-                    #    optimizer.step()
-
-
-                    # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
                     A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
-                    # L-BFGS optimizer
-                    optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=10)
-
-                    def closure():
-                        optimizer.zero_grad()
+                    optimizer = torch.optim.Adam([A], lr=1e-4)
+                    for step in range(num_adam_steps):
                         Sigma_torch = numpy_to_torch(Sigma).to(device)
                         C_torch = numpy_to_torch(C).to(device)
                         Phi_torch = numpy_to_torch(Phi).to(device)
-                        A.data = A.data.to(device)
-                        loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha) 
-                        if not torch.isfinite(loss):
-                            print("Non-finite loss encountered in closure")
-                            return loss
+
+                        optimizer.zero_grad()
+                        loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha)
+                        if not torch.isfinite(loss): break
                         loss.backward()
-                        return loss
+                        optimizer.step()
+
+
+                    # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
+                    #A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
+                    # L-BFGS optimizer
+                    #optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=10)
+
+                    #def closure():
+                    #    optimizer.zero_grad()
+                    #    Sigma_torch = numpy_to_torch(Sigma).to(device)
+                    #    C_torch = numpy_to_torch(C).to(device)
+                    #    Phi_torch = numpy_to_torch(Phi).to(device)
+                    #    A.data = A.data.to(device)
+                    #    loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha) 
+                    #    if not torch.isfinite(loss):
+                    #        print("Non-finite loss encountered in closure")
+                    #        return loss
+                    #    loss.backward()
+                    #    return loss
 
             
 
-                    for step in range(num_lbfgs_steps):
-                        optimizer.step(closure)
+                    #for step in range(num_lbfgs_steps):
+                    #    optimizer.step(closure)
 
-                    alpha *= alpha_factor
+                    #alpha *= alpha_factor
 
 
                     D1_em = A.detach().cpu().numpy()
@@ -186,7 +186,7 @@ if __name__ == "__main__":
 
                 tEnd = time.perf_counter() - tStart
 
-                D1_em[np.abs(D1_em) < w_threshold] = 0
+                #D1_em[np.abs(D1_em) < w_threshold] = 0
                 D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
                 D1_em_final = D1_em
 
@@ -195,14 +195,13 @@ if __name__ == "__main__":
                 D1_em_binary = np.abs(D1_em) >= threshold
 
                 TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
-                RMSE = np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro')
-
-                all_RMSE[param][nodex].append(RMSE)
+                #RMSE = np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro')
 
                 accuracy = (TP + TN) / (TP + TN + FP + FN + 1e-8)
                 RMSE = Err_D1[-1] if Err_D1 else np.nan
                 F1score = 2 * TP / (2 * TP + FP + FN + 1e-8)
 
+                all_RMSE[param][nodex].append(RMSE)
                 all_accuracy[param][nodex].append(accuracy)
                 all_f1[param][nodex].append(F1score)
                 all_time[param][nodex].append(tEnd)
@@ -233,7 +232,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "lbfgs_experiment_varalpha_alpha1_1_5.csv"
+    csv_path = "test_comparison.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
