@@ -14,7 +14,8 @@ from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
 from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_update
 from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
-from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
+from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss, grad_newloss
+from solvers.adam import adam
 
 
 
@@ -24,8 +25,8 @@ if __name__ == "__main__":
 
     # Experiment settings
     hyperparam = [0, 20]
-    nodes_size = [10]
-    random_seed = [40]
+    nodes_size = [7, 10, 15]
+    random_seed = [40, 41, 42, 43, 44]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
     print(f"Defined node sizes: {nodes_size}")
@@ -82,7 +83,7 @@ if __name__ == "__main__":
                 num_adam_steps = 1000
                 num_lbfgs_steps = 100
                 lambda_reg = 10
-                alpha = 0
+                alpha = 1
                 alpha_factor = 1
                 D1_em_save = np.zeros((Nz, Nz, Nit_em))
 
@@ -131,18 +132,18 @@ if __name__ == "__main__":
                     Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                         z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
 
-                    A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
-                    optimizer = torch.optim.Adam([A], lr=1e-4)
-                    for step in range(num_adam_steps):
-                        Sigma_torch = numpy_to_torch(Sigma).to(device)
-                        C_torch = numpy_to_torch(C).to(device)
-                        Phi_torch = numpy_to_torch(Phi).to(device)
+                    #A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
+                    #optimizer = torch.optim.Adam([A], lr=1e-4)
+                    #for step in range(num_adam_steps):
+                    #    Sigma_torch = numpy_to_torch(Sigma).to(device)
+                    #    C_torch = numpy_to_torch(C).to(device)
+                    #    Phi_torch = numpy_to_torch(Phi).to(device)
 
-                        optimizer.zero_grad()
-                        loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha)
-                        if not torch.isfinite(loss): break
-                        loss.backward()
-                        optimizer.step()
+                    #    optimizer.zero_grad()
+                    #    loss = compute_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha)
+                    #    if not torch.isfinite(loss): break
+                    #    loss.backward()
+                    #    optimizer.step()
 
 
                     # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
@@ -168,10 +169,15 @@ if __name__ == "__main__":
                     #for step in range(num_lbfgs_steps):
                     #    optimizer.step(closure)
 
+
+                    #running adam solver builded in this code:
+                    grad_loss = lambda D1_em, iteration_i: grad_newloss(D1_em,K,Q,Sigma,C,Phi,hyperparam[param],alpha)
+                    D1_em = adam(grad_loss, D1_em)
+
                     #alpha *= alpha_factor
 
 
-                    D1_em = A.detach().cpu().numpy()
+                    #D1_em = A.detach().cpu().numpy()
 
                     D1_em_save[:, :, i] = D1_em
                     Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
