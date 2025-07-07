@@ -6,22 +6,27 @@ from tools.loss import Compute_PhiK
 from tools.dag import grad_desc_penalty
 
 def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
-  Sk_inv = torch.linalg.pinv(Sk)
-  Nx = A.shape[0]  # Get the number of rows of A
+    Sk_inv = torch.linalg.pinv(Sk)
+    Nx = A.shape[0]
 
-  wk = Sk_inv @ vk
-  Jk = A @ Kk
-  Lk = A - Jk @ H
+    wk = Sk_inv @ vk
+    Jk = A @ Kk
+    Lk = A - Jk @ H
 
-  term1 = grad_A_mu_in @ Lk.T
+    term1 = grad_A_mu_in @ Lk.T
 
-  term2 = grad_A_sig @ torch.kron(H.T @ wk, Lk.T)
+    # Fix .kron layout issue
+    wk_vec = (H.T @ wk).reshape(-1, 1).contiguous()
+    Lk_T = Lk.T.contiguous()
+    kronterm = torch.kron(wk_vec, Lk_T)
+    term2 = grad_A_sig @ kronterm
 
-  term3 = torch.kron(xk_mean_new, torch.eye(Nx))
+    term3 = torch.kron(xk_mean_new.contiguous(), torch.eye(Nx, device=A.device))  
 
-  grad_A_mu_new = term1 + term2 + term3
+    grad_A_mu_new = term1 + term2 + term3
 
-  return grad_A_mu_new
+    return grad_A_mu_new
+
 
 
 def gradient_A_sig(grad_A_sig_in, A, H, Pk_minus, Kk):
@@ -60,20 +65,21 @@ def gradient_A_phik(grad_A_mu, H, vk, Sk, grad_A_sig):
     Sk_inv = torch.linalg.pinv(Sk)
     
     # Compute wk and Mk
-    wk = Sk_inv @ vk
-    Mk = torch.outer(wk, wk) - Sk_inv
+    wk = Sk_inv @ vk # vk is (Nx,) in your use case
+    Mk = torch.outer(wk, wk) - Sk_inv # torch.outer with 1D vector returns 2D matrix
     
     # Compute temp = H' * Mk * H
     temp = H.T @ Mk @ H
     
     # Compute grad_A_phik
+    # 0.5 * grad_A_sig @ temp.flatten() is correct if temp.flatten() produces 1D
     grad_A_phik = grad_A_mu @ H.T @ wk + 0.5 * grad_A_sig @ temp.flatten()
     
     return grad_A_phik
 
 def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     
-    dtype = torch.float32  # or float64 if you're using double precision everywhere
+    dtype = torch.float32
     
     A = A.to(dtype)
     Q = Q.to(dtype)
@@ -89,36 +95,56 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
     # Initialize storage
     z_mean_kalman_em = torch.zeros((Nz, K))
     P_kalman_em = torch.zeros((Nz, Nz, K))
-    yk_kalman_em = torch.zeros((Nx, K))
+    yk_kalman_em = torch.zeros((Nx, K)) # This will store the 1D vectors
     Sk_kalman_em = torch.zeros((Nx, Nx, K))
-
-
 
     Pk_minus = torch.zeros((Nx, Nx, K))
     Kk = torch.zeros((Nx, Nz, K))
 
-    grad_A_mu = torch.kron(z0, torch.eye(Nx))
+    grad_A_mu = torch.kron(z0, torch.eye(Nx)) 
     grad_A_sig = 2 * torch.kron(P0 @ A.T, torch.eye(Nx)) @ Nm
     grad_A_phik = torch.zeros((Nx**2, K))
 
     # First step
-    z_mean_kalman_em[:, 0], P_kalman_em[:, :, 0], yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], Pk_minus[:, :, 0], Kk[:, :, 0] = Kalman_update_torch(
+    z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update_torch(
         x[:, 0].unsqueeze(1), z0, P0, A, H, R, Q)
 
-    grad_A_phik[:, 0] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], grad_A_sig)
-    
+    # Assign to storage:
+    z_mean_kalman_em[:, 0] = z_mean_t0.squeeze()
+    P_kalman_em[:, :, 0] = P_t0
+    yk_kalman_em[:, 0] = yk_t0.squeeze() # THIS IS THE CRUCIAL CHANGE
+    Sk_kalman_em[:, :, 0] = Sk_t0
+    Pk_minus[:, :, 0] = Pk_minus_t0
+    Kk[:, :, 0] = Kk_t0
 
+    # These gradient functions expect 1D vectors for yk and xk_mean_new (which are yk_kalman_em[:, k] and z_mean_kalman_em[:, k] respectively)
+
+    print(f"shape sk: {Sk_kalman_em[:, :, 0].size()}")
+    print(f"shape yk: {yk_kalman_em[:, 0].size()}")
+    print(f"shape kk: {Kk[:, :, 0].size()}")
+    print(f"shape z: {z_mean_kalman_em[:, 0].size()}")
+
+    grad_A_phik[:, 0] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], grad_A_sig)
     grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, 0], yk_kalman_em[:, 0], Kk[:, :, 0], z_mean_kalman_em[:, 0])
     grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, 0], Kk[:, :, 0])
 
     # Loop over time steps
     for k in range(1, K):
-        z_mean_kalman_em[:, k], P_kalman_em[:, :, k], yk_kalman_em[:, k], Sk_kalman_em[:, :, k], Pk_minus[:, :, k], Kk[:, :, k] = Kalman_update_torch(
-            x[:, k].unsqueeze(1), z_mean_kalman_em[:, k-1], P_kalman_em[:, :, k-1], A, H, R, Q)
+        # The z_mean_kalman_em[:, k-1] passed here is already 1D. Kalman_update_torch expects a column vector for state.
+        # So, we need to unsqueeze it. This was missing in your original loop for the z_mean_kalman_em[:, k-1] input.
+        # This is another crucial point for consistency.
+        z_mean_tk, P_tk, yk_tk, Sk_tk, Pk_minus_tk, Kk_tk = Kalman_update_torch(
+            x[:, k].unsqueeze(1), z_mean_kalman_em[:, k-1].unsqueeze(1), P_kalman_em[:, :, k-1], A, H, R, Q)
+
+        # Assign back to storage, squeezing the column vectors to fit the 1D slices
+        z_mean_kalman_em[:, k] = z_mean_tk.squeeze()
+        P_kalman_em[:, :, k] = P_tk
+        yk_kalman_em[:, k] = yk_tk.squeeze() # CRUCIAL CHANGE HERE TOO
+        Sk_kalman_em[:, :, k] = Sk_tk
+        Pk_minus[:, :, k] = Pk_minus_tk
+        Kk[:, :, k] = Kk_tk
 
         grad_A_phik[:, k] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, k], Sk_kalman_em[:, :, k], grad_A_sig)
-        
-
         grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, k], yk_kalman_em[:, k], Kk[:, :, k], z_mean_kalman_em[:, k])
         grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, k], Kk[:, :, k])
 

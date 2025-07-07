@@ -17,10 +17,10 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
 from gradientEM.computegrad import compute_loss_gradient
 
 if __name__ == "__main__":
-    K = 2000  # length of time series
+    K = 500  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -38,8 +38,8 @@ if __name__ == "__main__":
     reg1 = 113
     gamma1 = 20
     num_lbfgs_steps = 10 # Adjust number of L-BFGS steps as needed
-    lambda_reg = 50
-    alpha = 50
+    lambda_reg = 5
+    alpha = 1
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
     
 
