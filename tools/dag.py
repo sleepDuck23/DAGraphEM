@@ -18,6 +18,20 @@ def logdet_dag(A):
         return torch.tensor(float('-inf'))
     return logdet
 
+def logdet_dag_np(A):
+    # A∘A = elementwise square, I = identity
+    I = np.eye(A.shape[0], dtype=A.dtype)
+    mat = I - A * A
+    # To ensure numerical stability add small jitter
+    #jitter = 1e-6 * I
+    #mat = mat + jitter
+    # logdet can be computed with torch.slogdet for stability
+    sign, logdet = np.linalg.slogdet(mat)
+    if (sign <= 0).any():
+        # handle non-positive definite case
+        return float('-inf')
+    return logdet
+
 def compute_loss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5):
     # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))
     CA_T = C @ A.T
@@ -66,6 +80,37 @@ def compute_new_loss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     #h = torch.trace(torch.linalg.matrix_exp(A*A)) - A.shape[0]
 
     return f1 + f2 + h 
+
+def compute_new_loss_np(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-4):
+    # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))
+    CA_T = C @ A.T
+    AC_T = A @ C.T
+    APhiA_T = A @ Phi @ A.T
+    inside = Sigma - CA_T - AC_T + APhiA_T
+    f1 = 0.5 * K * np.trace(Q @ inside)
+
+    # L1 norm
+    f2 = lambda_reg * np.sum(torch.sqrt(A**2 + delta**2))
+
+    # logdet penalty
+    h = -alpha * logdet_dag_np(A)
+    #h = torch.trace(torch.linalg.matrix_exp(A*A)) - A.shape[0]
+
+    return f1 + f2 + h 
+
+def grad_newloss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-4):
+    
+    grad_f1 = 0.5 * K * ((-2 * Q @ C) + (Q @ A @ Phi.T) + (Q @ A @ Phi))
+
+    
+    grad_f2 = lambda_reg * (A/(np.sqrt(A**2 + delta**2)))
+
+    
+    grad_h = -2 * alpha * (np.linalg.inv(A.shape[0] - A*A)).T
+    
+
+    return grad_f1 + grad_f2 + grad_h 
+
 
 def pipa_f1_h_loss(A,K,Q,Sigma,C,Phi,alpha=0.5):
     # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))

@@ -37,6 +37,7 @@ if __name__ == "__main__":
     all_accuracy = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_time = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_f1 = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+    all_notears = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_DAG = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
 
     for param in range(len(hyperparam)):
@@ -74,7 +75,6 @@ if __name__ == "__main__":
 
                 # GRAPHEM Init
                 Err_D1 = []
-                charac_dag = []
                 D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
                 Nit_em = 50
                 prec = 1e-2
@@ -175,11 +175,11 @@ if __name__ == "__main__":
 
                     D1_em_save[:, :, i] = D1_em
                     Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
-                    charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+                    charac_dag = float(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
 
                     if i > 0:
                         if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                           np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < prec:
+                           np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag < prec:
                             print(f"EM converged after iteration {i + 1}")
                             print(f"final alpha = {alpha}")
                             break
@@ -205,6 +205,7 @@ if __name__ == "__main__":
                 all_accuracy[param][nodex].append(accuracy)
                 all_f1[param][nodex].append(F1score)
                 all_time[param][nodex].append(tEnd)
+                all_notears[param][nodex].append(charac_dag)
 
                 TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
                 all_DAG[param][nodex].append(int(nx.is_directed_acyclic_graph(TestDAG)))
@@ -224,6 +225,7 @@ if __name__ == "__main__":
                     "Accuracy": all_accuracy[i][j][k] if k < len(all_accuracy[i][j]) else None,
                     "F1": all_f1[i][j][k] if k < len(all_f1[i][j]) else None,
                     "Time": all_time[i][j][k] if k < len(all_time[i][j]) else None,
+                    "NoTears": all_notears[i][j][k] if k < len(all_notears[i][j]) else None,
                     "Is_DAG": all_DAG[i][j][k] if k < len(all_DAG[i][j]) else None
                 }
                 results_list.append(result_dict)
