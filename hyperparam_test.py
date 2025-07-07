@@ -24,9 +24,9 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [0, 20]
-    nodes_size = [7, 10, 15]
-    random_seed = [40, 41, 42, 43, 44]
+    hyperparam = [2, 3, 4]
+    nodes_size = [7, 10, 15, 20]
+    random_seed = [40,41,42,43,44,45,46,47,48,49]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
     print(f"Defined node sizes: {nodes_size}")
@@ -82,7 +82,7 @@ if __name__ == "__main__":
                 w_threshold = 0.05
                 num_adam_steps = 1000
                 num_lbfgs_steps = 100
-                lambda_reg = 10
+                lambda_reg = 5
                 alpha = 1
                 alpha_factor = 1
                 D1_em_save = np.zeros((Nz, Nz, Nit_em))
@@ -171,10 +171,10 @@ if __name__ == "__main__":
 
 
                     #running adam solver builded in this code:
-                    grad_loss = lambda D1_em, iteration_i: grad_newloss(D1_em,K,Q,Sigma,C,Phi,hyperparam[param],alpha)
+                    grad_loss = lambda D1_em, iteration_i: grad_newloss(D1_em,K,Q,Sigma,C,Phi,lambda_reg,alpha)
                     D1_em = adam(grad_loss, D1_em)
 
-                    #alpha *= alpha_factor
+                    alpha *= hyperparam[param]
 
 
                     #D1_em = A.detach().cpu().numpy()
@@ -224,7 +224,7 @@ if __name__ == "__main__":
         for j, n_nodes in enumerate(nodes_size):
             for k, seed_idx in enumerate(random_seed):
                 result_dict = {
-                    "lambda": alpha_val,
+                    "factor": alpha_val,
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,

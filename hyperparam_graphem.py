@@ -23,9 +23,9 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [0]
-    nodes_size = [10]
-    random_seed = [42]
+    hyperparam = [2, 3, 4, 5]
+    nodes_size = [7, 10, 15, 20]
+    random_seed = [40,41,42,43,44,45,46,47,48,49]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
     print(f"Defined node sizes: {nodes_size}")
@@ -37,6 +37,7 @@ if __name__ == "__main__":
     all_accuracy = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_time = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_f1 = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+    all_notears = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_DAG = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
 
     for param in range(len(hyperparam)):
@@ -46,7 +47,7 @@ if __name__ == "__main__":
             for seeds in random_seed:
                 print(f"---- Seed: {seeds} ----")
 
-                K = 2000
+                K = 500
                 flag_plot = 0
 
                 D1, Graph = generate_random_DAG(nodes_size[nodex], graph_type='ER', edge_prob=0.2, seed=seeds)
@@ -65,7 +66,7 @@ if __name__ == "__main__":
 
                 Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q)).to(device)
 
-                reg = {'reg1': 0, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
+                reg = {'reg1': 113, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
 
                 saveX = np.zeros((Nx, K, 1))
 
@@ -148,7 +149,7 @@ if __name__ == "__main__":
                     D1_em = D1_em_  # D1 estimate updated
                     D1_em_save[:, :, i] = D1_em  # keep track of the sequence
                     Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
-                    charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+                    charac_dag = float(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
 
                     if i > 0:
                         if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
@@ -177,6 +178,7 @@ if __name__ == "__main__":
                 all_accuracy[param][nodex].append(accuracy)
                 all_f1[param][nodex].append(F1score)
                 all_time[param][nodex].append(tEnd)
+                all_notears[param][nodex].append(charac_dag)
 
                 TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
                 all_DAG[param][nodex].append(int(nx.is_directed_acyclic_graph(TestDAG)))
@@ -196,6 +198,7 @@ if __name__ == "__main__":
                     "Accuracy": all_accuracy[i][j][k] if k < len(all_accuracy[i][j]) else None,
                     "F1": all_f1[i][j][k] if k < len(all_f1[i][j]) else None,
                     "Time": all_time[i][j][k] if k < len(all_time[i][j]) else None,
+                    "Notears": all_notears[i][j][k] if k < len(all_notears[i][j]) else None,
                     "Is_DAG": all_DAG[i][j][k] if k < len(all_DAG[i][j]) else None
                 }
                 results_list.append(result_dict)
