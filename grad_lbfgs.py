@@ -15,6 +15,7 @@ from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
 from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
 from gradientEM.computegrad import compute_loss_gradient
+from solvers.adam import adam
 
 if __name__ == "__main__":
     K = 500  # length of time series
@@ -104,41 +105,10 @@ if __name__ == "__main__":
             Sk_kalman_em = np.zeros((Nx, Nx, K))
 
             x_k_initial = x[:, 0].reshape(-1, 1)  # Reshape to a column vector
-
-            # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
-            A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-            # L-BFGS optimizer
-            optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=50)
-            torch.autograd.set_detect_anomaly(True)
-
-            #Sigma_torch = numpy_to_torch(Sigma)
-            #C_torch = numpy_to_torch(C)
-            #Phi_torch = numpy_to_torch(Phi)
-            z0_torch = numpy_to_torch(z0)
-            P0_torch = numpy_to_torch(P0)
-            x_k_torch = numpy_to_torch(x)
-            Q_torch = numpy_to_torch(Q)
-            D2_torch = numpy_to_torch(D2)
-            R_torch = numpy_to_torch(R)
-
-
-            def closure():
-                optimizer.zero_grad()
-                loss, _, _ = compute_loss_gradient(A,Q_torch,x_k_torch,z0_torch,P0_torch,D2_torch,R_torch,Nx,Nz,K)
-                if not torch.isfinite(loss):
-                    print("Non-finite loss encountered in closure")
-                    return loss
-                loss.backward()
-                return loss
-
             
 
-            for step in range(num_lbfgs_steps):
-                optimizer.step(closure)
-
-            
-            D1_em = A.detach().cpu().numpy()
-            
+            loss, grad_loss, _ = lambda D1_em, iteration_i: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)
+            D1_em = adam(grad_loss, D1_em)
             
 
             #D1_em = D1_em_  # D1 estimate updated

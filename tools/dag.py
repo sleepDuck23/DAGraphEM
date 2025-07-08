@@ -136,7 +136,7 @@ def pipa_f1_h_grad(A,K,Q,Sigma,C,Phi,alpha=0.5):
 
     return f1_g + h_grad
 
-def grad_desc_penalty(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
+def grad_desc_penalty_torch(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     # L1 norm
     f2 = lambda_reg * torch.sum(torch.sqrt(A**2 + delta**2))
 
@@ -148,5 +148,20 @@ def grad_desc_penalty(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
 
     # logdet gradient
     grad_h = -alpha * 2 * A * torch.linalg.inv(torch.eye(A.shape[0])- A*A).T
+
+    return f2 + h, grad_f2 + grad_h
+
+def grad_desc_penalty(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
+    # L1 norm
+    f2 = lambda_reg * np.sum(np.sqrt(A**2 + delta**2))
+
+    # L1 norm gradient
+    grad_f2 = lambda_reg * A/(np.sqrt(A*A + delta**2))
+
+    # logdet penalty
+    h = -alpha * logdet_dag(A)
+
+    # logdet gradient
+    grad_h = -alpha * 2 * A * np.linalg.inv(np.eye(A.shape[0])- A*A).T
 
     return f2 + h, grad_f2 + grad_h
