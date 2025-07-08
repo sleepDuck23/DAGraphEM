@@ -109,20 +109,22 @@ if __name__ == "__main__":
             A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
             # L-BFGS optimizer
             optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=50)
+            torch.autograd.set_detect_anomaly(True)
+
+            #Sigma_torch = numpy_to_torch(Sigma)
+            #C_torch = numpy_to_torch(C)
+            #Phi_torch = numpy_to_torch(Phi)
+            z0_torch = numpy_to_torch(z0)
+            P0_torch = numpy_to_torch(P0)
+            x_k_torch = numpy_to_torch(x)
+            Q_torch = numpy_to_torch(Q)
+            D2_torch = numpy_to_torch(D2)
+            R_torch = numpy_to_torch(R)
+
 
             def closure():
                 optimizer.zero_grad()
-                #Sigma_torch = numpy_to_torch(Sigma)
-                #C_torch = numpy_to_torch(C)
-                #Phi_torch = numpy_to_torch(Phi)
-                z0_torch = numpy_to_torch(z0)
-                P0_torch = numpy_to_torch(P0)
-                x_k_initial_torch = numpy_to_torch(x_k_initial)
-                Q_torch = numpy_to_torch(Q)
-                D2_torch = numpy_to_torch(D2)
-                R_torch = numpy_to_torch(R)
-
-                loss, _, _ = compute_loss_gradient(A,Q_torch,x_k_initial_torch,z0_torch,P0_torch,D2_torch,R_torch,Nx,Nz,K)
+                loss, _, _ = compute_loss_gradient(A,Q_torch,x_k_torch,z0_torch,P0_torch,D2_torch,R_torch,Nx,Nz,K)
                 if not torch.isfinite(loss):
                     print("Non-finite loss encountered in closure")
                     return loss

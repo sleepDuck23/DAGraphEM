@@ -147,6 +147,6 @@ def grad_desc_penalty(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     h = -alpha * logdet_dag(A)
 
     # logdet gradient
-    grad_h = -alpha * 2 * A * torch.linalg.inv(np.eye(A.shape[0]- A*A)).T
+    grad_h = -alpha * 2 * A * torch.linalg.inv(torch.eye(A.shape[0])- A*A).T
 
     return f2 + h, grad_f2 + grad_h

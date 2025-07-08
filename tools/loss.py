@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from numpy.linalg import norm, svd
 
 from tools.matrix import reshape_my_A
@@ -44,6 +45,20 @@ def Compute_PhiK(Phi0, Sk_kal, yk_kal):
       PhiK = PhiK + 0.5 * np.log(np.linalg.det(2 * np.pi * Sk_k)) + 0.5 * yk_k.T @ np.linalg.inv(Sk_k) @ yk_k
 
     return PhiK
+
+def Compute_PhiK_torch(Phi0, Sk_kal, yk_kal):
+    K = Sk_kal.shape[2]
+    PhiK_inc = 0.0  # Use a temporary scalar accumulator
+
+    for k in range(K):
+        Sk_k = Sk_kal[:, :, k]
+        yk_k = yk_kal[:, k]
+
+        log_det_term = 0.5 * torch.logdet(2 * torch.pi * Sk_k)
+        inv_term = 0.5 * yk_k.T @ torch.linalg.inv(Sk_k) @ yk_k
+        PhiK_inc += log_det_term + inv_term
+
+    return Phi0 + PhiK_inc
 
 def Compute_Prior_D1(D1, reg):
     reg1_type = reg.get('reg1')

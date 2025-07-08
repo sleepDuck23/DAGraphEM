@@ -2,7 +2,7 @@ import torch
 
 from gradientEM.comutation import commutmatrix
 from tools.EM import Kalman_update_torch
-from tools.loss import Compute_PhiK
+from tools.loss import Compute_PhiK_torch
 from tools.dag import grad_desc_penalty
 
 def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
@@ -88,8 +88,6 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
     Kom = commutmatrix(Nx, Nx)
     Nm = (torch.eye(Nx**2) + Kom) / 2
 
-    print(f"size of Nm: {Nm}")
-
     # Initialize storage
     z_mean_kalman_em = torch.zeros((Nz, K))
     P_kalman_em = torch.zeros((Nz, Nz, K))
@@ -106,7 +104,8 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
     # First step
     z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update_torch(
         x[:, 0].unsqueeze(1), z0, P0, A, H, R, Q)
-
+    
+    
     # Assign to storage:
     z_mean_kalman_em[:, 0] = z_mean_t0.squeeze()
     P_kalman_em[:, :, 0] = P_t0
@@ -117,22 +116,15 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
 
     # These gradient functions expect 1D vectors for yk and xk_mean_new (which are yk_kalman_em[:, k] and z_mean_kalman_em[:, k] respectively)
 
-    print(f"shape sk: {Sk_kalman_em[:, :, 0].size()}")
-    print(f"shape yk: {yk_kalman_em[:, 0].size()}")
-    print(f"shape kk: {Kk[:, :, 0].size()}")
-    print(f"shape z: {z_mean_kalman_em[:, 0].size()}")
-
     grad_A_phik[:, 0] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], grad_A_sig)
     grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, 0], yk_kalman_em[:, 0], Kk[:, :, 0], z_mean_kalman_em[:, 0])
     grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, 0], Kk[:, :, 0])
 
     # Loop over time steps
     for k in range(1, K):
-        # The z_mean_kalman_em[:, k-1] passed here is already 1D. Kalman_update_torch expects a column vector for state.
-        # So, we need to unsqueeze it. This was missing in your original loop for the z_mean_kalman_em[:, k-1] input.
-        # This is another crucial point for consistency.
+        x_k = x[:, k].reshape(-1, 1) 
         z_mean_tk, P_tk, yk_tk, Sk_tk, Pk_minus_tk, Kk_tk = Kalman_update_torch(
-            x[:, k].unsqueeze(1), z_mean_kalman_em[:, k-1].unsqueeze(1), P_kalman_em[:, :, k-1], A, H, R, Q)
+            x_k, z_mean_kalman_em[:, k-1].unsqueeze(1), P_kalman_em[:, :, k-1], A, H, R, Q)
 
         # Assign back to storage, squeezing the column vectors to fit the 1D slices
         z_mean_kalman_em[:, k] = z_mean_tk.squeeze()
@@ -149,7 +141,7 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
         
     penalty, grad_penalty = grad_desc_penalty(A,lambda_reg,alpha,delta)
 
-    phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em) + penalty
+    phi = Compute_PhiK_torch(0, Sk_kalman_em, yk_kalman_em) + penalty
 
     dphiA = -torch.reshape(torch.sum(grad_A_phik, axis=1), (Nx, Nx)) + grad_penalty
   
