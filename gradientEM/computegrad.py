@@ -9,19 +9,15 @@ def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
     Sk_inv = torch.linalg.pinv(Sk)
     Nx = A.shape[0]
 
-    wk = Sk_inv @ vk
-    Jk = A @ Kk
-    Lk = A - Jk @ H
+    wk = Sk_inv @ vk # Nx,1
+    Jk = A @ Kk # Nx,Nx
+    Lk = A - Jk @ H # Nx,Nx
 
-    term1 = grad_A_mu_in @ Lk.T
+    term1 = grad_A_mu_in @ Lk.T # Nx**2, Nx
 
-    # Fix .kron layout issue
-    wk_vec = (H.T @ wk).reshape(-1, 1).contiguous()
-    Lk_T = Lk.T.contiguous()
-    kronterm = torch.kron(wk_vec, Lk_T)
-    term2 = grad_A_sig @ kronterm
+    term2 = grad_A_sig @  torch.kron((H.T @ wk).view(-1, 1), Lk.T.contiguous()) # Nx**2, Nx
 
-    term3 = torch.kron(xk_mean_new.contiguous(), torch.eye(Nx, device=A.device))  
+    term3 = torch.kron(xk_mean_new.view(-1, 1), torch.eye(Nx, device=A.device))  # Nx**2, Nx
 
     grad_A_mu_new = term1 + term2 + term3
 
@@ -44,38 +40,38 @@ def gradient_A_sig(grad_A_sig_in, A, H, Pk_minus, Kk):
     numpy.ndarray: The updated gradient of A with respect to sigma.
   """
 
-  Jk = A @ Kk
-  Lk = A - Jk @ H
+  Jk = A @ Kk # Nx,Nx
+  Lk = A - Jk @ H # Nx,Nx
   Nx = A.shape[0]  # Get the number of rows of A
 
   Kom = commutmatrix(Nx, Nx)
 
-  Nm = (torch.eye(Nx**2) + Kom) / 2
+  Nm = (torch.eye(Nx**2) + Kom) / 2 # Nx**2,Nx**2
 
-  term1 = grad_A_sig_in @ torch.kron(Lk.T, Lk.T)
+  term1 = grad_A_sig_in @ torch.kron(Lk.T, Lk.T) # Nx**2,Nx**2
 
-  term2 = 2 * torch.kron(Pk_minus @ Lk.T, torch.eye(Nx)) @ Nm
+  term2 = 2 * torch.kron(Pk_minus @ Lk.T, torch.eye(Nx)) @ Nm # Nx**2,Nx**2
 
   grad_A_sig_new = term1 + term2
 
-  return grad_A_sig_new
+  return grad_A_sig_new # Nx**2,Nx**2
 
 def gradient_A_phik(grad_A_mu, H, vk, Sk, grad_A_sig):
     # Compute pseudo-inverse of Sk
-    Sk_inv = torch.linalg.pinv(Sk)
+    Sk_inv = torch.linalg.pinv(Sk) # Nx,Nx
     
     # Compute wk and Mk
-    wk = Sk_inv @ vk # vk is (Nx,) in your use case
-    Mk = torch.outer(wk, wk) - Sk_inv # torch.outer with 1D vector returns 2D matrix
+    wk = Sk_inv @ vk # vk is (Nx,) in your use case # Nx,1
+    Mk = torch.outer(wk, wk) - Sk_inv # torch.outer with 1D vector returns 2D matrix #Nx,Nx
     
     # Compute temp = H' * Mk * H
-    temp = H.T @ Mk @ H
+    temp = H.T @ Mk @ H # Nx,Nx
     
     # Compute grad_A_phik
     # 0.5 * grad_A_sig @ temp.flatten() is correct if temp.flatten() produces 1D
     grad_A_phik = grad_A_mu @ H.T @ wk + 0.5 * grad_A_sig @ temp.flatten()
     
-    return grad_A_phik
+    return grad_A_phik # Nx**2,1
 
 def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     
@@ -92,10 +88,12 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
     Kom = commutmatrix(Nx, Nx)
     Nm = (torch.eye(Nx**2) + Kom) / 2
 
+    print(f"size of Nm: {Nm}")
+
     # Initialize storage
     z_mean_kalman_em = torch.zeros((Nz, K))
     P_kalman_em = torch.zeros((Nz, Nz, K))
-    yk_kalman_em = torch.zeros((Nx, K)) # This will store the 1D vectors
+    yk_kalman_em = torch.zeros((Nx, K)) 
     Sk_kalman_em = torch.zeros((Nx, Nx, K))
 
     Pk_minus = torch.zeros((Nx, Nx, K))
@@ -112,7 +110,7 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
     # Assign to storage:
     z_mean_kalman_em[:, 0] = z_mean_t0.squeeze()
     P_kalman_em[:, :, 0] = P_t0
-    yk_kalman_em[:, 0] = yk_t0.squeeze() # THIS IS THE CRUCIAL CHANGE
+    yk_kalman_em[:, 0] = yk_t0.squeeze() 
     Sk_kalman_em[:, :, 0] = Sk_t0
     Pk_minus[:, :, 0] = Pk_minus_t0
     Kk[:, :, 0] = Kk_t0
