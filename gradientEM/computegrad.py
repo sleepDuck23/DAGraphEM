@@ -34,9 +34,9 @@ def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
 
     term1 = grad_A_mu_in @ Lk.T # Nx**2, Nx
 
-    term2 = grad_A_sig @  np.kron((H.T @ wk).view(-1, 1), Lk.T.contiguous()) # Nx**2, Nx
+    term2 = grad_A_sig @  np.kron((H.T @ wk).reshape(-1, 1), np.ascontiguousarray(Lk.T)) # Nx**2, Nx
 
-    term3 = np.kron(xk_mean_new.view(-1, 1), np.eye(Nx))  # Nx**2, Nx
+    term3 = np.kron(xk_mean_new.reshape(-1, 1), np.eye(Nx))  # Nx**2, Nx
 
     grad_A_mu_new = term1 + term2 + term3
 
@@ -215,21 +215,10 @@ def compute_loss_gradient_torch(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,
   
     dphi = dphiA.flatten()
 
-    print('+')
     return phi, dphi, dphiA
 
-def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=0.5,delta=1e-4):
+def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1,delta=1e-4):
     
-    dtype = np.float32
-    
-    A = A.to(dtype)
-    Q = Q.to(dtype)
-    x = x.to(dtype)
-    z0 = z0.to(dtype)
-    P0 = P0.to(dtype)
-    H = H.to(dtype)
-    R = R.to(dtype)
-
     Kom = commutmatrix(Nx, Nx)
     Nm = (np.eye(Nx**2) + Kom) / 2
 
@@ -248,7 +237,7 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
 
     # First step
     z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update(
-        x[:, 0].unsqueeze(1), z0, P0, A, H, R, Q)
+        x[:, 0:1], z0, P0, A, H, R, Q)
     
     
     # Assign to storage:
@@ -269,7 +258,7 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
     for k in range(1, K):
         x_k = x[:, k].reshape(-1, 1) 
         z_mean_tk, P_tk, yk_tk, Sk_tk, Pk_minus_tk, Kk_tk = Kalman_update(
-            x_k, z_mean_kalman_em[:, k-1].unsqueeze(1), P_kalman_em[:, :, k-1], A, H, R, Q)
+            x_k, z_mean_kalman_em[:, k-1:k], P_kalman_em[:, :, k-1], A, H, R, Q)
 
         # Assign back to storage, squeezing the column vectors to fit the 1D slices
         z_mean_kalman_em[:, k] = z_mean_tk.squeeze()
@@ -292,5 +281,6 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=0.1,alpha=
   
     dphi = dphiA.flatten()
 
-    print('+')
+    print(f"phi: {phi}, dphi: {dphi}, dphiA: {dphiA}")
+
     return phi, dphi, dphiA

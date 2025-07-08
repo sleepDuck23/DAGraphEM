@@ -18,7 +18,7 @@ from gradientEM.computegrad import compute_loss_gradient
 from solvers.adam import adam
 
 if __name__ == "__main__":
-    K = 500  # length of time series
+    K = 2000  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
     D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     reg1 = 113
     gamma1 = 20
     num_lbfgs_steps = 10 # Adjust number of L-BFGS steps as needed
-    lambda_reg = 5
+    lambda_reg = 20
     alpha = 1
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
     
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         Err_D1 = []
         charac_dag = []
         stop_crit = []
-        Nit_em = 50  # number of iterations maximum for EM loop
+        Nit_em = 2  # number of iterations maximum for EM loop
         prec = 1e-4  # precision for EM loop
         precDAG = 1e-3
         w_threshold = 1e-1
@@ -104,11 +104,9 @@ if __name__ == "__main__":
             yk_kalman_em = np.zeros((Nx, K))
             Sk_kalman_em = np.zeros((Nx, Nx, K))
 
-            x_k_initial = x[:, 0].reshape(-1, 1)  # Reshape to a column vector
+            grad_fn = lambda D1_em, i: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
             
-
-            loss, grad_loss, _ = lambda D1_em, iteration_i: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)
-            D1_em = adam(grad_loss, D1_em)
+            D1_em = adam(grad_fn, D1_em)
             
 
             #D1_em = D1_em_  # D1 estimate updated

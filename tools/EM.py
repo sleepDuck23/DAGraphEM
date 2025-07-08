@@ -45,7 +45,7 @@ def Kalman_update(y_k,xk_mean_past,Pk_past,A,H,R,Q):
     xk_mean_new = xk_minus + Kk @ vk
     Pk_new = Pk_minus - Kk @ Sk @ Kk.T
 
-    return xk_mean_new, Pk_new, vk, Sk
+    return xk_mean_new, Pk_new, vk, Sk, Pk_minus, Kk
 
 def Kalman_update_torch(y_k, xk_mean_past, Pk_past, A, H, R, Q):
     xk_minus = A @ xk_mean_past
