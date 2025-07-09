@@ -55,8 +55,8 @@ if __name__ == "__main__":
     num_adam_steps = 1000
     lambda_reg = 20
     alpha = 1
-    stepsize = 1e-4
-    upper_alpha = 1e8  # upper bound for alpha
+    stepsize = 1e-2
+    upper_alpha = 1e6  # upper bound for alpha
     
 
     reg = {}
@@ -76,6 +76,7 @@ if __name__ == "__main__":
     F1score = np.zeros(Nreal)
     saveX = np.zeros((Nx, K, Nreal))
 
+    alpha_values = []
 
     for real in range(Nreal):
         print(f"---- REALIZATION {real + 1} ----")
@@ -91,10 +92,10 @@ if __name__ == "__main__":
         Err_D1 = []
         charac_dag = []
         loss_dag = []
+        A_norm = []
         Nit_em = 50  # number of iterations maximum for EM loop
         prec = 1e-4  # precision for EM loop
-        w_threshold = 0.05
-        factor_alpha = 1.1
+        factor_alpha = 1.1  # factor to increase alpha
         grad_norm_threshold = 1e-5  # threshold for gradient norm
 
         tStart = time.perf_counter() 
@@ -166,9 +167,9 @@ if __name__ == "__main__":
             D1_em, grad_norm = adam(grad_loss, D1_em,step_size=stepsize, num_iters=num_adam_steps, callback=None)
 
             
-            if alpha < upper_alpha and grad_norm_threshold > grad_norm:
+            if alpha < upper_alpha:
                 alpha *= factor_alpha
-            
+
             
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
@@ -177,7 +178,8 @@ if __name__ == "__main__":
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
             dagness = numpy_to_torch(-alpha * logdet_dag(D1_em))
             loss_dag.append(dagness)
-
+            alpha_values.append(alpha)
+            A_norm.append(np.linalg.norm(D1_em, np.inf))
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
@@ -289,5 +291,21 @@ if __name__ == "__main__":
         plt.title('DAG loss of A')
         plt.xlabel('GRAPHEM iterations')
         plt.ylabel('Characterization')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(7)
+        plt.semilogy(alpha_values)
+        plt.title('Alpha evolution')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('alpha')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(8)
+        plt.semilogy(A_norm)
+        plt.title('A norm evolution')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('A norm')
         plt.grid(True)
         plt.show()

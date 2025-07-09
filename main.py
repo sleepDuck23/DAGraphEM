@@ -13,7 +13,7 @@ from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
 
 if __name__ == "__main__":
-    K = 100  # length of time series
+    K = 500  # length of time series
     flag_plot = 1
 
     # Load ground truth matrix D1
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -98,14 +98,14 @@ if __name__ == "__main__":
             Sk_kalman_em = np.zeros((Nx, Nx, K))
 
             x_k_initial = x[:, 0].reshape(-1, 1)  # Reshape to a column vector
-            z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0] = \
+            z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0],_,_ = \
                 Kalman_update(x_k_initial, z0, P0, D1_em, D2, R, Q)
             z_mean_kalman_em[:, 0] = z_mean_kalman_em_temp.flatten()
             yk_kalman_em[:, 0] = yk_kalman_em_temp.flatten()
 
             for k in range(1, K):
                 x_k = x[:, k].reshape(-1, 1)      # Reshape each observation
-                z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k] = \
+                z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k],_,_ = \
                     Kalman_update(x_k, z_mean_kalman_em[:, k - 1].reshape(-1, 1), P_kalman_em[:, :, k - 1], D1_em, D2, R, Q)
                 z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
                 yk_kalman_em[:, k] = yk_kalman_em_temp.flatten()

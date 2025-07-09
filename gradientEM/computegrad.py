@@ -281,6 +281,4 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
   
     dphi = dphiA.flatten()
 
-    print(f"phi: {phi}, dphi: {dphi}, dphiA: {dphiA}")
-
     return phi, dphi, dphiA

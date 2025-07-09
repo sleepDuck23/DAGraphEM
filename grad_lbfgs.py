@@ -21,7 +21,7 @@ if __name__ == "__main__":
     K = 500  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -94,9 +94,6 @@ if __name__ == "__main__":
         #x = np.stack(x, axis=1)  
 
         for i in range(Nit_em):  # EM iterations
-            # Just for visualization purposes
-            if i % 1 == 0:
-                    print(f"EM Step {i}")
             
             # 1/ Kalman filter filter
             z_mean_kalman_em = np.zeros((Nz, K))
@@ -104,9 +101,9 @@ if __name__ == "__main__":
             yk_kalman_em = np.zeros((Nx, K))
             Sk_kalman_em = np.zeros((Nx, Nx, K))
 
-            grad_fn = lambda D1_em, i: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
+            grad_fn  = lambda D1_em: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
             
-            D1_em = adam(grad_fn, D1_em)
+            D1_em, _ = adam(grad_fn, D1_em,step_size=1e-2)
             
 
             #D1_em = D1_em_  # D1 estimate updated
