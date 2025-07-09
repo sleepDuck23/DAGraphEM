@@ -13,7 +13,7 @@ from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
 from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_update
 from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
-from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss, compute_loss_zero
+from tools.dag import numpy_to_torch, logdet_dag_torch, compute_loss, compute_new_loss, compute_loss_zero
 
 if __name__ == "__main__":
     K = 100  # length of time series
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40)  # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -52,8 +52,10 @@ if __name__ == "__main__":
     reg1 = 113
     gamma1 = 0
     num_adam_steps = 1000
-    lambda_reg = 5
+    lambda_reg = 7
     alpha = 1
+    factor_alpha = 1.5
+    upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
     
 
@@ -91,6 +93,7 @@ if __name__ == "__main__":
         loss_dag = []
         Nit_em = 50  # number of iterations maximum for EM loop
         prec = 1e-2  # precision for EM loop
+        prec_dag = 1e-9
         w_threshold = 0.05
         factor_alpha = 1.5
 
@@ -118,14 +121,14 @@ if __name__ == "__main__":
             Sk_kalman_em = np.zeros((Nx, Nx, K))
 
             x_k_initial = x[:, 0].reshape(-1, 1)  # Reshape to a column vector
-            z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0] = \
+            z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0],_,_ = \
                 Kalman_update(x_k_initial, z0, P0, D1_em, D2, R, Q)
             z_mean_kalman_em[:, 0] = z_mean_kalman_em_temp.flatten()
             yk_kalman_em[:, 0] = yk_kalman_em_temp.flatten()
 
             for k in range(1, K):
                 x_k = x[:, k].reshape(-1, 1)      # Reshape each observation
-                z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k] = \
+                z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k],_,_ = \
                     Kalman_update(x_k, z_mean_kalman_em[:, k - 1].reshape(-1, 1), P_kalman_em[:, :, k - 1], D1_em, D2, R, Q)
                 z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
                 yk_kalman_em[:, k] = yk_kalman_em_temp.flatten()
@@ -186,7 +189,8 @@ if __name__ == "__main__":
                     print(f"Grad norm: {grad_norm:.2f}")
 
             D1_em = A.detach().cpu().numpy()
-            alpha *= factor_alpha
+            if alpha < upper_alpha:
+                alpha *= factor_alpha
             
             #Below is the older implementation using MM-Douglas-Rachford method
 
@@ -210,13 +214,13 @@ if __name__ == "__main__":
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
-            dagness = numpy_to_torch(-alpha * logdet_dag(A))
+            dagness = numpy_to_torch(-alpha * logdet_dag_torch(A))
             loss_dag.append(dagness)
 
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and loss_dag[i] < prec:
+                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag[i] < prec_dag:
                     print(f"EM converged after iteration {i + 1}")
                     break
 

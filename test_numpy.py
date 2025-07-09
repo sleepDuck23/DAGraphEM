@@ -12,12 +12,12 @@ from tools.matrix import calError
 from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
 from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_update
 from tools.prox import prox_stable
-from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
-from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss, compute_loss_zero, grad_newloss, logdet_dag_np
+from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG, create_fixed_upper_triangular_dag
+from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss, compute_loss_zero, grad_newloss
 from solvers.adam import adam
 
 if __name__ == "__main__":
-    K = 100  # length of time series
+    K = 500  # length of time series
     flag_plot = 1
 
     ## Load ground truth matrix D1
@@ -55,7 +55,8 @@ if __name__ == "__main__":
     num_adam_steps = 1000
     lambda_reg = 20
     alpha = 1
-    stepsize = 0.1
+    stepsize = 1e-4
+    upper_alpha = 1e8  # upper bound for alpha
     
 
     reg = {}
@@ -91,13 +92,15 @@ if __name__ == "__main__":
         charac_dag = []
         loss_dag = []
         Nit_em = 50  # number of iterations maximum for EM loop
-        prec = 1e-2  # precision for EM loop
+        prec = 1e-4  # precision for EM loop
         w_threshold = 0.05
-        factor_alpha = 1
+        factor_alpha = 1.1
+        grad_norm_threshold = 1e-5  # threshold for gradient norm
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
         D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
+        #D1_em = create_fixed_upper_triangular_dag(Nz, weight=0.5)  # Initialize D1_em to a fixed upper triangular DAG
         D1_em_save = np.zeros((Nz, Nz, Nit_em))
         PhiK = np.zeros(Nit_em)
         MLsave = np.zeros(Nit_em)
@@ -119,14 +122,14 @@ if __name__ == "__main__":
             Sk_kalman_em = np.zeros((Nx, Nx, K))
 
             x_k_initial = x[:, 0].reshape(-1, 1)  # Reshape to a column vector
-            z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0] = \
+            z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0],_,_ = \
                 Kalman_update(x_k_initial, z0, P0, D1_em, D2, R, Q)
             z_mean_kalman_em[:, 0] = z_mean_kalman_em_temp.flatten()
             yk_kalman_em[:, 0] = yk_kalman_em_temp.flatten()
 
             for k in range(1, K):
                 x_k = x[:, k].reshape(-1, 1)      # Reshape each observation
-                z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k] = \
+                z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k],_,_ = \
                     Kalman_update(x_k, z_mean_kalman_em[:, k - 1].reshape(-1, 1), P_kalman_em[:, :, k - 1], D1_em, D2, R, Q)
                 z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
                 yk_kalman_em[:, k] = yk_kalman_em_temp.flatten()
@@ -159,11 +162,12 @@ if __name__ == "__main__":
                                                 z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
             
            #running adam solver builded in this code:
-            grad_loss = lambda D1_em, iteration_i: grad_newloss(D1_em,K,Q,Sigma,C,Phi,lambda_reg,alpha)
-            D1_em = adam(grad_loss, D1_em)
+            grad_loss = lambda D1_em: grad_newloss(D1_em,K,Q_inv,Sigma,C,Phi,lambda_reg,alpha)
+            D1_em, grad_norm = adam(grad_loss, D1_em,step_size=stepsize, num_iters=num_adam_steps, callback=None)
 
             
-            alpha *= factor_alpha
+            if alpha < upper_alpha and grad_norm_threshold > grad_norm:
+                alpha *= factor_alpha
             
             
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
@@ -171,7 +175,7 @@ if __name__ == "__main__":
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
-            dagness = numpy_to_torch(-alpha * logdet_dag_np(D1_em))
+            dagness = numpy_to_torch(-alpha * logdet_dag(D1_em))
             loss_dag.append(dagness)
 
 

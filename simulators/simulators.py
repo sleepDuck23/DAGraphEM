@@ -110,3 +110,12 @@ def generate_random_DAG(N,
                 A[:, j] = A[:, j] / (col_norm + 1e-6) * 0.99  # enforce strict < 1
 
     return A, G
+
+def create_fixed_upper_triangular_dag(N, weight=0.5):
+    A = np.zeros((N, N))
+    
+    for i in range(N):
+        for j in range(i + 1, N):  # strictly upper triangle (i < j)
+            A[i, j] = weight
+
+    return A

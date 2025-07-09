@@ -18,7 +18,7 @@ from gradientEM.computegrad import compute_loss_gradient
 from solvers.adam import adam
 
 if __name__ == "__main__":
-    K = 2000  # length of time series
+    K = 500  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
     D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=42) # Could also use the prox stable too (test it after)
