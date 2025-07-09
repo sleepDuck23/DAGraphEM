@@ -23,7 +23,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [2, 3, 4, 5]
+    hyperparam = [3,5,10,20]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
                 Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q)).to(device)
 
-                reg = {'reg1': 113, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
+                reg = {'reg1': 0, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
 
                 saveX = np.zeros((Nx, K, 1))
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
                     Sk_kalman_em = np.zeros((Nx, Nx, K))
 
                     x_k_initial = x[:, 0].reshape(-1, 1)
-                    z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0] = Kalman_update(
+                    z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0], _, _ = Kalman_update(
                         x_k_initial, z0, P0, D1_em, D2, R, Q
                     )
                     z_mean_kalman_em[:, 0] = z_mean_kalman_em_temp.flatten()
@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
                     for k in range(1, K):
                         x_k = x[:, k].reshape(-1, 1)
-                        z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k] = Kalman_update(
+                        z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k], _, _ = Kalman_update(
                             x_k, z_mean_kalman_em[:, k - 1].reshape(-1, 1), P_kalman_em[:, :, k - 1], D1_em, D2, R, Q
                         )
                         z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "test_comparison.csv"
+    csv_path = "graphem_reg0.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
