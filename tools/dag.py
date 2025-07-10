@@ -158,12 +158,12 @@ def grad_desc_penalty(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     f2 = lambda_reg * np.sum(np.sqrt(A**2 + delta**2))
 
     # L1 norm gradient
-    grad_f2 = lambda_reg * A/(np.sqrt(A*A + delta**2))
+    grad_f2 = lambda_reg * A/(np.sqrt(A**2 + delta**2))
 
     # logdet penalty
     h = -alpha * logdet_dag(A)
 
     # logdet gradient
-    grad_h = alpha * 2 * A * np.linalg.inv(np.eye(A.shape[0])- A*A).T 
+    grad_h = alpha * 2 * A * sla.inv(np.eye(A.shape[0])- A*A).T 
 
     return f2 + h, grad_f2 + grad_h

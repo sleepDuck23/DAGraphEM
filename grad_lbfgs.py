@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
             grad_fn  = lambda D1_em: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
             
-            D1_em, _ = adam(grad_fn, D1_em,step_size=1e-2)
+            D1_em, _ = adam(grad_fn, D1_em,step_size=1e-4, num_iters=1000)
             
 
             #D1_em = D1_em_  # D1 estimate updated
