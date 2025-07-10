@@ -31,7 +31,7 @@ def GenerateSynthetic_order_p(K,A,H,p,x0,sigma_P, sigma_Q, sigma_R):
 def generate_random_DAG(N, 
                          graph_type='ER', 
                          edge_prob=0.3, 
-                         weight_range=(0.5, 2.0), 
+                         weight_range=(0.1, 0.99), 
                          seed=None,
                          enforce_ar1=True):
     """

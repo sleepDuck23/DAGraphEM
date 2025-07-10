@@ -33,7 +33,7 @@ if __name__ == "__main__":
     #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40,weight_range=(0.5, 0.99)) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -52,11 +52,14 @@ if __name__ == "__main__":
 
     reg1 = 113
     gamma1 = 0
-    num_adam_steps = 1000
+    num_adam_steps = 2000
     lambda_reg = 20
     alpha = 1
-    stepsize = 1e-2
-    upper_alpha = 1e6  # upper bound for alpha
+    factor_alpha = 1.1 # factor to increase alpha
+    stepsize = 1e-4
+    upper_alpha = 1e8  # upper bound for alpha
+
+    w_threshold = 1e-4  # threshold to eliminate small weights
     
 
     reg = {}
@@ -93,9 +96,10 @@ if __name__ == "__main__":
         charac_dag = []
         loss_dag = []
         A_norm = []
-        Nit_em = 50  # number of iterations maximum for EM loop
-        prec = 1e-4  # precision for EM loop
-        factor_alpha = 1.1  # factor to increase alpha
+        spectral_norm = []
+        Nit_em = 15  # number of iterations maximum for EM loop
+        prec = 1e-2  # precision for EM loop
+        prec_DAG = 1e-9
         grad_norm_threshold = 1e-5  # threshold for gradient norm
 
         tStart = time.perf_counter() 
@@ -168,7 +172,7 @@ if __name__ == "__main__":
 
             
             if alpha < upper_alpha:
-                alpha *= factor_alpha
+                alpha += np.log(2+factor_alpha*i) # increase alpha
 
             
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
@@ -176,14 +180,15 @@ if __name__ == "__main__":
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
-            dagness = numpy_to_torch(-alpha * logdet_dag(D1_em))
+            dagness = numpy_to_torch(-alpha * logdet_dag(D1_em/np.linalg.norm(D1_em, np.inf)))  # compute DAGness
             loss_dag.append(dagness)
             alpha_values.append(alpha)
             A_norm.append(np.linalg.norm(D1_em, np.inf))
+            spectral_norm.append(np.linalg.norm(D1_em,ord=2))
 
             if i > 0:
                 if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and loss_dag[i] < prec:
+                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and loss_dag[i] < prec_DAG:
                     print(f"EM converged after iteration {i + 1}")
                     break
 
@@ -191,7 +196,7 @@ if __name__ == "__main__":
         tEnd[real] = time.perf_counter() - tStart
         print(f"final alpha: {alpha}")
 
-        #D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
+        D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
 
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
@@ -246,6 +251,8 @@ if __name__ == "__main__":
     print(f"average recall = {np.nanmean(recall):.4f}")
     print(f"average specificity = {np.nanmean(specificity):.4f}")
     print(f"average F1 score = {np.nanmean(F1score):.4f}")
+
+    
 
 
     if flag_plot == 1:
@@ -307,5 +314,13 @@ if __name__ == "__main__":
         plt.title('A norm evolution')
         plt.xlabel('GRAPHEM iterations')
         plt.ylabel('A norm')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(9)
+        plt.semilogy(spectral_norm)
+        plt.title('Spectral norm evolution')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('Spectral norm')
         plt.grid(True)
         plt.show()

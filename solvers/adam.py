@@ -28,9 +28,9 @@ def adam(grad, x, callback=None, num_iters=200, step_size=0.001, clip=1.0, clip_
 
 
 
-        if grad_norm < tol:
-            print(f"Early stopping at iteration {i}, gradient norm {grad_norm:.2e} < tol {tol}")
-            break
+        #if grad_norm < tol:
+        #    print(f"Early stopping at iteration {i}, gradient norm {grad_norm:.2e} < tol {tol}")
+        #    break
 
         m = (1 - b1) * g + b1 * m  # First  moment estimate.
         v = (1 - b2) * (g**2) + b2 * v  # Second moment estimate.
@@ -41,6 +41,8 @@ def adam(grad, x, callback=None, num_iters=200, step_size=0.001, clip=1.0, clip_
         if i % 10 == 0:
             print(f"Iteration {i}, gradient norm {grad_norm:.2e}, step size: {step_size:.2e}")
 
-        if i>(num_iters/2) and i%(num_iters/10)==0:
-            step_size *= 0.99  # Decay step size for stability
+        if grad_norm < 1e-3 and step_size < 1e-1:
+            step_size *= 1.1
+        elif grad_norm > 1e4 and step_size > 1e-6:
+            step_size *= 0.9
     return x, grad_norm

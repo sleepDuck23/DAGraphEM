@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import scipy.linalg as sla
 
 def numpy_to_torch(x):
     return torch.tensor(x, dtype=torch.float32)
@@ -101,13 +102,13 @@ def compute_new_loss_np(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-4):
 
 def grad_newloss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     
-    grad_f1 = 0.5 * K * (-(C.T @ Q) - (Q @ C.T) + A @ (Q @ Phi + Phi.T @ Q))
+    grad_f1 = 0.5 * K * (-(Q @ C) - (Q.T @ C) + (Q.T @ A @ Phi.T) + (Q @ A @ Phi)) 
 
     
     grad_f2 = lambda_reg * (A/(np.sqrt(A**2 + delta**2)))
 
     
-    grad_h = 2 * alpha * A * (np.linalg.inv(np.eye(A.shape[0]) - A*A)).T
+    grad_h = 2 * alpha * A * (sla.inv(np.eye(A.shape[0]) - A*A)).T
     
 
     return grad_f1 + grad_f2 + grad_h 

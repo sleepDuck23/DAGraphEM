@@ -16,7 +16,7 @@ from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1,
 from tools.dag import numpy_to_torch, logdet_dag_torch, compute_loss, compute_new_loss, compute_loss_zero
 
 if __name__ == "__main__":
-    K = 100  # length of time series
+    K = 500  # length of time series
     flag_plot = 1
 
     ## Load ground truth matrix D1
@@ -52,9 +52,9 @@ if __name__ == "__main__":
     reg1 = 113
     gamma1 = 0
     num_adam_steps = 1000
-    lambda_reg = 7
-    alpha = 1
-    factor_alpha = 1.5
+    lambda_reg = 20
+    alpha = 0
+    factor_alpha = 1.1
     upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
     
@@ -91,11 +91,12 @@ if __name__ == "__main__":
         Err_D1 = []
         charac_dag = []
         loss_dag = []
+        A_norm = []
+        spectral_norm = []
+        alpha_values = []
         Nit_em = 50  # number of iterations maximum for EM loop
         prec = 1e-2  # precision for EM loop
         prec_dag = 1e-9
-        w_threshold = 0.05
-        factor_alpha = 1.5
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
@@ -176,7 +177,7 @@ if __name__ == "__main__":
 
                 optimizer.zero_grad()
                 #loss = compute_loss_zero(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
-                loss = compute_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
+                loss = compute_new_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
                 if not torch.isfinite(loss):
                     print("Non-finite loss encountered")
                     break
@@ -190,7 +191,7 @@ if __name__ == "__main__":
 
             D1_em = A.detach().cpu().numpy()
             if alpha < upper_alpha:
-                alpha *= factor_alpha
+                alpha *= factor_alpha*np.log(2+i)
             
             #Below is the older implementation using MM-Douglas-Rachford method
 
@@ -216,6 +217,9 @@ if __name__ == "__main__":
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
             dagness = numpy_to_torch(-alpha * logdet_dag_torch(A))
             loss_dag.append(dagness)
+            alpha_values.append(alpha)
+            A_norm.append(np.linalg.norm(D1_em, np.inf))
+            spectral_norm.append(np.linalg.norm(D1_em,ord=2))
 
 
             if i > 0:
@@ -328,5 +332,29 @@ if __name__ == "__main__":
         plt.title('DAG loss of A')
         plt.xlabel('GRAPHEM iterations')
         plt.ylabel('Characterization')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(7)
+        plt.semilogy(alpha_values)
+        plt.title('Alpha evolution')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('alpha')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(8)
+        plt.semilogy(A_norm)
+        plt.title('A norm evolution')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('A norm')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure(9)
+        plt.semilogy(spectral_norm)
+        plt.title('Spectral norm evolution')
+        plt.xlabel('GRAPHEM iterations')
+        plt.ylabel('Spectral norm')
         plt.grid(True)
         plt.show()
