@@ -43,7 +43,7 @@ if __name__ == "__main__":
     P0 = sigma_P**2 * np.eye(Nz)
     z0 = np.ones((Nz, 1))
 
-    reg1 =1
+    reg1 =0
     gamma1 = 5
 
     reg = {}
@@ -167,10 +167,15 @@ if __name__ == "__main__":
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
 
+
         threshold = 1e-10
         D1_binary = np.abs(D1) >= threshold
         D1_em_binary = np.abs(D1_em_final) >= threshold
         TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
+
+        print(D1_em_final)
+        print("True D1:")
+        print(D1_binary)
 
         TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
         print(int(nx.is_directed_acyclic_graph(TestDAG)))
