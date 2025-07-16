@@ -24,7 +24,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [2, 3, 4]
+    hyperparam = [0, 0.5, 1, 10, 20, 50]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -48,7 +48,7 @@ if __name__ == "__main__":
             for seeds in random_seed:
                 print(f"---- Seed: {seeds} ----")
 
-                K = 2000
+                K = 500
                 flag_plot = 0
 
                 D1, Graph = generate_random_DAG(nodes_size[nodex], graph_type='ER', edge_prob=0.2, seed=seeds)
@@ -90,13 +90,16 @@ if __name__ == "__main__":
                 tStart = time.perf_counter() 
 
                 for i in range(Nit_em):
+                    if i % 10 == 0:
+                        print(f"EM iteration {i + 1}")
+
                     z_mean_kalman_em = np.zeros((Nz, K))
                     P_kalman_em = np.zeros((Nz, Nz, K))
                     yk_kalman_em = np.zeros((Nx, K))
                     Sk_kalman_em = np.zeros((Nx, Nx, K))
 
                     x_k_initial = x[:, 0].reshape(-1, 1)
-                    z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0] = Kalman_update(
+                    z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0],_,_ = Kalman_update(
                         x_k_initial, z0, P0, D1_em, D2, R, Q
                     )
                     z_mean_kalman_em[:, 0] = z_mean_kalman_em_temp.flatten()
@@ -104,7 +107,7 @@ if __name__ == "__main__":
 
                     for k in range(1, K):
                         x_k = x[:, k].reshape(-1, 1)
-                        z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k] = Kalman_update(
+                        z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k],_,_ = Kalman_update(
                             x_k, z_mean_kalman_em[:, k - 1].reshape(-1, 1), P_kalman_em[:, :, k - 1], D1_em, D2, R, Q
                         )
                         z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
@@ -147,37 +150,37 @@ if __name__ == "__main__":
 
 
                     # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
-                    #A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
+                    A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
                     # L-BFGS optimizer
-                    #optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=10)
+                    optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=10)
 
-                    #def closure():
-                    #    optimizer.zero_grad()
-                    #    Sigma_torch = numpy_to_torch(Sigma).to(device)
-                    #    C_torch = numpy_to_torch(C).to(device)
-                    #    Phi_torch = numpy_to_torch(Phi).to(device)
-                    #    A.data = A.data.to(device)
-                    #    loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha) 
-                    #    if not torch.isfinite(loss):
-                    #        print("Non-finite loss encountered in closure")
-                    #        return loss
-                    #    loss.backward()
-                    #    return loss
+                    def closure():
+                        optimizer.zero_grad()
+                        Sigma_torch = numpy_to_torch(Sigma).to(device)
+                        C_torch = numpy_to_torch(C).to(device)
+                        Phi_torch = numpy_to_torch(Phi).to(device)
+                        A.data = A.data.to(device)
+                        loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha) 
+                        if not torch.isfinite(loss):
+                            print("Non-finite loss encountered in closure")
+                            return loss
+                        loss.backward()
+                        return loss
 
             
 
-                    #for step in range(num_lbfgs_steps):
-                    #    optimizer.step(closure)
+                    for step in range(num_lbfgs_steps):
+                        optimizer.step(closure)
 
 
                     #running adam solver builded in this code:
-                    grad_loss = lambda D1_em, iteration_i: grad_newloss(D1_em,K,Q,Sigma,C,Phi,lambda_reg,alpha)
-                    D1_em = adam(grad_loss, D1_em)
+                    #grad_loss = lambda D1_em: grad_newloss(D1_em,K,Q,Sigma,C,Phi,hyperparam[param],alpha)
+                    #D1_em,_ = adam(grad_loss, D1_em)
 
-                    alpha *= hyperparam[param]
+                    #alpha *= hyperparam[param]
 
 
-                    #D1_em = A.detach().cpu().numpy()
+                    D1_em = A.detach().cpu().numpy()
 
                     D1_em_save[:, :, i] = D1_em
                     Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
@@ -220,11 +223,11 @@ if __name__ == "__main__":
     # Prepare a list of dictionaries for DataFrame rows
     results_list = []
 
-    for i, alpha_val in enumerate(hyperparam):
+    for i, hyperparam_val in enumerate(hyperparam):
         for j, n_nodes in enumerate(nodes_size):
             for k, seed_idx in enumerate(random_seed):
                 result_dict = {
-                    "factor": alpha_val,
+                    "lambda": hyperparam_val,
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
@@ -240,7 +243,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "test_comparison.csv"
+    csv_path = "dagraphem_lbfgs_torch_lambda.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")

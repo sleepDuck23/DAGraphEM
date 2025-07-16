@@ -38,8 +38,8 @@ def adam(grad, x, callback=None, num_iters=200, step_size=0.001, clip=1.0, clip_
         vhat = v / (1 - b2 ** (i + 1))
         x = x - step_size * mhat / (np.sqrt(vhat) + eps)
 
-        if i % 10 == 0:
-            print(f"Iteration {i}, gradient norm {grad_norm:.2e}, step size: {step_size:.2e}")
+        #if i % 10 == 0:
+        #    print(f"Iteration {i}, gradient norm {grad_norm:.2e}, step size: {step_size:.2e}")
 
         if grad_norm < 1e-3 and step_size < 1e-1:
             step_size *= 1.1
