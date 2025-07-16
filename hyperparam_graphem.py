@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 Err_D1 = []
                 charac_dag = []
                 Nit_em = 50
-                prec = 1e-4
+                prec = 1e-2
 
                 tStart = time.perf_counter() 
                 # initialization of GRAPHEM
