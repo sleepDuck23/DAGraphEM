@@ -23,7 +23,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [0]
+    hyperparam = [3, 5, 10, 20]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
             for seeds in random_seed:
                 print(f"---- Seed: {seeds} ----")
 
-                K = 500
+                K = 2000
                 flag_plot = 0
 
                 D1, Graph = generate_random_DAG(nodes_size[nodex], graph_type='ER', edge_prob=0.2, seed=seeds)
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
                 Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q)).to(device)
 
-                reg = {'reg1': 0, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
+                reg = {'reg1': 1, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
 
                 saveX = np.zeros((Nx, K, 1))
 
@@ -198,7 +198,7 @@ if __name__ == "__main__":
                     "Accuracy": all_accuracy[i][j][k] if k < len(all_accuracy[i][j]) else None,
                     "F1": all_f1[i][j][k] if k < len(all_f1[i][j]) else None,
                     "Time": all_time[i][j][k] if k < len(all_time[i][j]) else None,
-                    "Notears": all_notears[i][j][k] if k < len(all_notears[i][j]) else None,
+                    "NoTears": all_notears[i][j][k] if k < len(all_notears[i][j]) else None,
                     "Is_DAG": all_DAG[i][j][k] if k < len(all_DAG[i][j]) else None
                 }
                 results_list.append(result_dict)
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "graphem_reg0.csv"
+    csv_path = "graphem_reg1_k2000.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")

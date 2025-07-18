@@ -24,7 +24,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [0, 0.5, 1, 10, 20, 50]
+    hyperparam = [0, 0.5, 1, 10, 20]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -152,7 +152,7 @@ if __name__ == "__main__":
                     # Implementation of the DAG characterization function while using L-BFGS solver for a gradient descent
                     A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True, device=device)
                     # L-BFGS optimizer
-                    optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=10)
+                    optimizer = torch.optim.LBFGS([A], lr=1, max_iter=num_lbfgs_steps,history_size=5)
 
                     def closure():
                         optimizer.zero_grad()
