@@ -33,7 +33,7 @@ if __name__ == "__main__":
     #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40,weight_range=(0.5, 0.99)) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -50,20 +50,20 @@ if __name__ == "__main__":
     Q_inv = np.linalg.inv(Q)
     Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q))
 
-    reg1 = 113
+    #reg1 = 113
     gamma1 = 0
     num_adam_steps = 2000
-    lambda_reg = 20
+    lambda_reg = 10
     alpha = 1
-    factor_alpha = 1.1 # factor to increase alpha
+    factor_alpha = 5 # factor to increase alpha
     stepsize = 1e-4
-    upper_alpha = 1e8  # upper bound for alpha
+    upper_alpha = 1e12  # upper bound for alpha
 
     w_threshold = 1e-4  # threshold to eliminate small weights
     
 
     reg = {}
-    reg['reg1'] = reg1
+    #reg['reg1'] = reg1
     reg['gamma1'] = gamma1
 
     Mask_true = (D1 != 0)
@@ -90,15 +90,15 @@ if __name__ == "__main__":
 
         # Inference (GRAPHEM algorithm)
         print('-- GRAPHEM + DAG --')
-        print(f"Regularization on D1: norm {reg1} with gamma1 = {gamma1}")
+        #print(f"Regularization on D1: norm {reg1} with gamma1 = {gamma1}")
 
         Err_D1 = []
         charac_dag = []
         loss_dag = []
         A_norm = []
         spectral_norm = []
-        Nit_em = 15  # number of iterations maximum for EM loop
-        prec = 1e-2  # precision for EM loop
+        Nit_em = 50  # number of iterations maximum for EM loop
+        prec = 1e-4  # precision for EM loop
         prec_DAG = 1e-9
         grad_norm_threshold = 1e-5  # threshold for gradient norm
 
@@ -143,10 +143,10 @@ if __name__ == "__main__":
             PhiK[i] = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
 
             # compute penalty function before update
-            Reg_before = Compute_Prior_D1(D1_em, reg)
-            MLsave[i] = PhiK[i]
-            Regsave[i] = Reg_before
-            PhiK[i] = PhiK[i] + Reg_before  # update loss function
+            #Reg_before = Compute_Prior_D1(D1_em, reg)
+            #MLsave[i] = PhiK[i]
+            #Regsave[i] = Reg_before
+            #PhiK[i] = PhiK[i] + Reg_before  # update loss function
 
             # 2/ Kalman smoother
             z_mean_smooth_em = np.zeros((Nz, K))
@@ -171,10 +171,6 @@ if __name__ == "__main__":
             D1_em, grad_norm = adam(grad_loss, D1_em,step_size=stepsize, num_iters=num_adam_steps, callback=None)
 
             
-            if alpha < upper_alpha:
-                alpha += np.log(2+factor_alpha*i) # increase alpha
-
-            
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
@@ -186,9 +182,17 @@ if __name__ == "__main__":
             A_norm.append(np.linalg.norm(D1_em, np.inf))
             spectral_norm.append(np.linalg.norm(D1_em,ord=2))
 
+            stop_crit = np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') /np.linalg.norm(D1_em_save[:, :, i - 1], 'fro')
+
+            if alpha < upper_alpha and stop_crit < 1e-2:
+                alpha *= factor_alpha # increase alpha
+                print(f"End of EM step {i + 1}")
+                print(f"alpha: {alpha}")
+                print(f"lambda_reg: {lambda_reg}")
+                print(f"Matrix A: {D1_em}")
+            
             if i > 0:
-                if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and loss_dag[i] < prec_DAG:
+                if stop_crit < prec and loss_dag[i] < prec_DAG or alpha >= upper_alpha:
                     print(f"EM converged after iteration {i + 1}")
                     break
 
@@ -200,6 +204,10 @@ if __name__ == "__main__":
 
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
+
+        print(f"Final D1_em: {D1_em_final}")
+
+        print(f"True graph: {D1}")
 
         threshold = 1e-10
         D1_binary = np.abs(D1) >= threshold
