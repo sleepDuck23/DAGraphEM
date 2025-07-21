@@ -69,9 +69,8 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
 
         grad_norm = np.linalg.norm(g) 
 
-        
-        if i% 50 == 0:
-            min(alpha * 1.05, 500.0)
+        if i % 10 == 0 and grad_norm < 1:
+            alpha = min(alpha * 1.05, 1e12)
 
         
         if grad_norm > clip and clip_flag:
@@ -97,6 +96,6 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
 
         if grad_norm < 1e-3 and step_size < 1e-1:
             step_size *= 1.1
-        elif grad_norm > 1e4 and step_size > 1e-6:
+        elif grad_norm > 1e4 and step_size > 1e-10:
             step_size *= 0.9
     return x, grad_norm

@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
         grad_fn  = lambda D1_em, alpha: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
             
-        D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-4, num_iters=1000, clip=1e3, clip_flag=True)
+        D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-6, num_iters=2000)
 
         tEnd[real] = time.perf_counter() - tStart
 
