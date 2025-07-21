@@ -277,7 +277,7 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
 
     phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em) + penalty
 
-    dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx)) + grad_penalty
+    dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx)) #- grad_penalty
   
     dphi = dphiA.flatten()
 
