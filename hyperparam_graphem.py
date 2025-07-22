@@ -207,7 +207,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "graphem_reg1_k2000.csv"
+    csv_path = "graphem_reg113_k2000.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
