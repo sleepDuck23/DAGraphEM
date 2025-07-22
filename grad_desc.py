@@ -39,7 +39,7 @@ if __name__ == "__main__":
     reg1 = 113
     gamma1 = 20
     num_lbfgs_steps = 10 # Adjust number of L-BFGS steps as needed
-    lambda_reg = 30
+    lambda_reg = 15
     alpha = 1
     factor_alpha = 1.1
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
         #D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
-        D1_em = np.zeros((Nz, Nz))
+        D1_em = np.zeros((Nz, Nz)) 
         D1_em_save = np.zeros((Nz, Nz, Nit_em))
         PhiK = np.zeros(Nit_em)
         MLsave = np.zeros(Nit_em)
@@ -102,7 +102,7 @@ if __name__ == "__main__":
         grad_fn  = lambda D1_em, alpha: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
 
             
-        D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-2, num_iters=200,clip=100,clip_flag=True)
+        D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-4, num_iters=1000,clip=100,clip_flag=True)
 
         tEnd[real] = time.perf_counter() - tStart
 
