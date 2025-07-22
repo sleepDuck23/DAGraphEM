@@ -67,10 +67,11 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
         if callback:
             callback(x, g)
 
+
         grad_norm = np.linalg.norm(g) 
 
-        if i % 10 == 0 and grad_norm < 1:
-            alpha = min(alpha * 1.05, 1e12)
+        if grad_norm < 1e2:
+            alpha = min(alpha * 5, 1e12)
 
         
         if grad_norm > clip and clip_flag:
@@ -89,9 +90,9 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
         vhat = v / (1 - b2 ** (i + 1))
         x = x - step_size * mhat / (np.sqrt(vhat) + eps)
 
-        if i % 100 == 0:
-            print(f"Iteration {i}, gradient norm {grad_norm:.2e}, step size: {step_size:.2e}")
-            #print(f"matrix A: {x}")
+        if (i+1) % 25 == 0:
+            print(f"Iteration {i+1}, gradient norm {grad_norm:.2e}, step size: {step_size:.2e}")
+            print(f"matrix A: {x}")
             print(f"alpha: {alpha}")
 
         if grad_norm < 1e-3 and step_size < 1e-1:

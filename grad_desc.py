@@ -21,7 +21,7 @@ if __name__ == "__main__":
     K = 500  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(3, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     reg1 = 113
     gamma1 = 20
     num_lbfgs_steps = 10 # Adjust number of L-BFGS steps as needed
-    lambda_reg = 20
+    lambda_reg = 30
     alpha = 1
     factor_alpha = 1.1
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
@@ -80,7 +80,8 @@ if __name__ == "__main__":
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
-        D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
+        #D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
+        D1_em = np.zeros((Nz, Nz))
         D1_em_save = np.zeros((Nz, Nz, Nit_em))
         PhiK = np.zeros(Nit_em)
         MLsave = np.zeros(Nit_em)
@@ -99,14 +100,16 @@ if __name__ == "__main__":
         #D1_em, _ = adam(grad_fn, D1_em,step_size=1e-4, num_iters=1000)
 
         grad_fn  = lambda D1_em, alpha: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
+
             
-        D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-6, num_iters=2000)
+        D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-2, num_iters=200,clip=100,clip_flag=True)
 
         tEnd[real] = time.perf_counter() - tStart
 
-        D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
+        D1_em[D1_em < w_threshold] = 0 #Eliminate edges that are close to zero0
 
         D1_em_final = D1_em
+        print(f"Final D1 estimated:\n{D1_em_final}")
 
         TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
 
@@ -159,6 +162,9 @@ if __name__ == "__main__":
     print(f"average F1 score = {np.nanmean(F1score):.4f}")
     print(f"Is it a DAG = {nx.is_directed_acyclic_graph(TestDAG)}")
 
+    print(f"Final D1 estimated:\n{D1_em_final}")
+    print(f"Final D1 true:\n{D1}")
+
     if flag_plot == 1:
         plt.figure()
         plt.subplot(1, 2, 1)
@@ -171,36 +177,4 @@ if __name__ == "__main__":
         plt.colorbar()
         plt.title('Estimated D1')
         plt.axis('off')
-        plt.show()
-
-        plt.figure(3)
-        plt.semilogy(Err_D1)
-        plt.title('Error on A')
-        plt.xlabel('GRAPHEM iterations')
-        plt.ylabel('Frobenius Norm Error')
-        plt.grid(True)
-        plt.show()
-
-        plt.figure(4)
-        plt.plot(PhiK[:len(Err_D1)])
-        plt.title('Loss function')
-        plt.xlabel('GRAPHEM iterations')
-        plt.ylabel('Loss Value')
-        plt.grid(True)
-        plt.show()
-
-        plt.figure(5)
-        plt.semilogy(charac_dag)
-        plt.title('DAG characterization of A')
-        plt.xlabel('GRAPHEM iterations')
-        plt.ylabel('Characterization')
-        plt.grid(True)
-        plt.show()
-
-        plt.figure(6)
-        plt.semilogy(stop_crit)
-        plt.title('Stop criterion')
-        plt.xlabel('GRAPHEM iterations')
-        plt.ylabel('Loss')
-        plt.grid(True)
         plt.show()
