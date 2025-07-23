@@ -24,7 +24,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [0, 0.5, 1, 10, 20]
+    hyperparam = [1.0 , 1.5, 2.0, 5.0, 7.0]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -82,9 +82,10 @@ if __name__ == "__main__":
                 w_threshold = 0.05
                 num_adam_steps = 1000
                 num_lbfgs_steps = 100
-                lambda_reg = 5
+                lambda_reg = 10
                 alpha = 1
                 alpha_factor = 1
+                upper_alpha = 1e12
                 D1_em_save = np.zeros((Nz, Nz, Nit_em))
 
                 tStart = time.perf_counter() 
@@ -174,8 +175,14 @@ if __name__ == "__main__":
 
 
                     #running adam solver builded in this code:
-                    grad_loss = lambda D1_em: grad_newloss(D1_em,K,Q,Sigma,C,Phi,hyperparam[param],alpha)
+                    grad_loss = lambda D1_em: grad_newloss(D1_em,K,Q,Sigma,C,Phi,lambda_reg,alpha)
                     D1_em,_ = adam(grad_loss, D1_em)
+
+                    stop_crit = np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') /np.linalg.norm(D1_em_save[:, :, i - 1], 'fro')
+
+
+                    if alpha < upper_alpha and stop_crit < 1e-2:
+                        alpha *= hyperparam[param] # increase alpha
 
                     #alpha *= hyperparam[param]
 
@@ -187,8 +194,7 @@ if __name__ == "__main__":
                     charac_dag = float(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
 
                     if i > 0:
-                        if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
-                           np.linalg.norm(D1_em_save[:, :, i - 1], 'fro') < prec and charac_dag < prec:
+                        if stop_crit < prec and charac_dag < prec:
                             print(f"EM converged after iteration {i + 1}")
                             print(f"final alpha = {alpha}")
                             break
@@ -199,7 +205,7 @@ if __name__ == "__main__":
                 D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
                 D1_em_final = D1_em
 
-                threshold = 1e-10
+                threshold = 1e-4
                 D1_binary = np.abs(D1) >= threshold
                 D1_em_binary = np.abs(D1_em) >= threshold
 
@@ -227,7 +233,7 @@ if __name__ == "__main__":
         for j, n_nodes in enumerate(nodes_size):
             for k, seed_idx in enumerate(random_seed):
                 result_dict = {
-                    "lambda": hyperparam_val,
+                    "alpha": hyperparam_val,
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
@@ -243,7 +249,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "dagraphem_adam_numpy_lambda_k2000.csv"
+    csv_path = "dagraphem_adam_numpy_1e4_alpha_k2000.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
