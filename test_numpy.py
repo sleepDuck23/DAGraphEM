@@ -33,7 +33,7 @@ if __name__ == "__main__":
     #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(20, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -52,12 +52,12 @@ if __name__ == "__main__":
 
     #reg1 = 113
     gamma1 = 0
-    num_adam_steps = 2000
-    lambda_reg = 10
+    num_adam_steps = 1000
+    lambda_reg = 20
     alpha = 1
-    factor_alpha = 5 # factor to increase alpha
+    factor_alpha = 1.5 # factor to increase alpha
     stepsize = 1e-4
-    upper_alpha = 1e12  # upper bound for alpha
+    upper_alpha = 1e15  # upper bound for alpha
 
     w_threshold = 1e-4  # threshold to eliminate small weights
     
@@ -104,8 +104,9 @@ if __name__ == "__main__":
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
-        D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
-        #D1_em = create_fixed_upper_triangular_dag(Nz, weight=0.5)  # Initialize D1_em to a fixed upper triangular DAG
+        #D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
+        D1_em = create_fixed_upper_triangular_dag(Nz, weight=0.5)  # Initialize D1_em to a fixed upper triangular DAG
+        #D1_em = np.zeros((Nz, Nz))  # Initialize D1_em to a zero matrix
         D1_em_save = np.zeros((Nz, Nz, Nit_em))
         PhiK = np.zeros(Nit_em)
         MLsave = np.zeros(Nit_em)
@@ -186,10 +187,11 @@ if __name__ == "__main__":
 
             if alpha < upper_alpha and stop_crit < 1e-2:
                 alpha *= factor_alpha # increase alpha
-                print(f"End of EM step {i + 1}")
-                print(f"alpha: {alpha}")
-                print(f"lambda_reg: {lambda_reg}")
-                print(f"Matrix A: {D1_em}")
+
+            #if i % 5 == 0:
+            #    print(f"Iteration {i + 1}:")
+            #    print(f"alpha: {alpha}")
+            #    print(f"Matrix A: {D1_em}")
             
             if i > 0:
                 if stop_crit < prec and loss_dag[i] < prec_DAG or alpha >= upper_alpha:
@@ -236,6 +238,7 @@ if __name__ == "__main__":
         nx.draw(G_est, pos, width=linewidths_est, with_labels=False, node_size=30, arrowsize=10)
         plt.title('Estimated D1 Network')
         plt.tight_layout()
+        plt.savefig('D1_networks.png', dpi=300)
         plt.show()
 
         precision[real] = TP / (TP + FP + 1e-8)

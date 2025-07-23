@@ -38,7 +38,6 @@ if __name__ == "__main__":
 
     reg1 = 113
     gamma1 = 20
-    num_lbfgs_steps = 10 # Adjust number of L-BFGS steps as needed
     lambda_reg = 15
     alpha = 1
     factor_alpha = 1.1
@@ -102,7 +101,7 @@ if __name__ == "__main__":
         grad_fn  = lambda D1_em, alpha: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
 
             
-        D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-4, num_iters=1000,clip=100,clip_flag=True)
+        D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-4, num_iters=500,clip=100,clip_flag=True)
 
         tEnd[real] = time.perf_counter() - tStart
 
