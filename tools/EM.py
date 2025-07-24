@@ -141,6 +141,7 @@ def update_case_1(Sigma, Phi, C, K, sigma_Q, reg, D10, Maj_D1):
 
     for i in range(ItDR):
         D1 = prox_L1(1, gamma1, Y)
+        
         V = prox_ML_D1(C, Phi, sigma_Q, 1, 2 * D1 - Y, K)
         Y = Y + V - D1
 

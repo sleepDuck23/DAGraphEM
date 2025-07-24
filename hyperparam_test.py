@@ -24,9 +24,13 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [1.0 , 1.5, 2.0, 5.0, 7.0]
+    hyperparam = [1.0 , 1.5, 2.0, 5.0, 10.0]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
+
+    #hyperparam = [5.0]
+    #nodes_size = [5]
+    #random_seed = [40]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
     print(f"Defined node sizes: {nodes_size}")
@@ -48,7 +52,7 @@ if __name__ == "__main__":
             for seeds in random_seed:
                 print(f"---- Seed: {seeds} ----")
 
-                K = 2000
+                K = 500
                 flag_plot = 0
 
                 D1, Graph = generate_random_DAG(nodes_size[nodex], graph_type='ER', edge_prob=0.2, seed=seeds)
@@ -66,6 +70,7 @@ if __name__ == "__main__":
                 z0 = np.ones((Nz, 1))
 
                 Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q)).to(device)
+                Q_inv = np.linalg.inv(Q)
 
                 reg = {'reg1': 113, 'gamma1': 20, 'Mask': (D1 != 0)}
 
@@ -79,8 +84,10 @@ if __name__ == "__main__":
                 D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
                 Nit_em = 50
                 prec = 1e-2
-                w_threshold = 0.05
+                prec_dag = 1e-12
+                w_threshold = 1e-4
                 num_adam_steps = 1000
+                stepsize = 1e-4
                 num_lbfgs_steps = 100
                 lambda_reg = 10
                 alpha = 1
@@ -91,8 +98,8 @@ if __name__ == "__main__":
                 tStart = time.perf_counter() 
 
                 for i in range(Nit_em):
-                    if i % 10 == 0:
-                        print(f"EM iteration {i + 1}")
+                #    if i % 10 == 0:
+                #        print(f"EM iteration {i + 1}")
 
                     z_mean_kalman_em = np.zeros((Nz, K))
                     P_kalman_em = np.zeros((Nz, Nz, K))
@@ -173,41 +180,52 @@ if __name__ == "__main__":
                     #for step in range(num_lbfgs_steps):
                     #    optimizer.step(closure)
 
-
+                    #D1_em = A.detach().cpu().numpy()
                     #running adam solver builded in this code:
-                    grad_loss = lambda D1_em: grad_newloss(D1_em,K,Q,Sigma,C,Phi,lambda_reg,alpha)
-                    D1_em,_ = adam(grad_loss, D1_em)
+                    grad_loss = lambda D1_em: grad_newloss(D1_em,K,Q_inv,Sigma,C,Phi,lambda_reg,alpha)
+                    D1_em,_ = adam(grad_loss, D1_em,step_size=stepsize, num_iters=num_adam_steps, callback=None)
 
+                    D1_em_save[:, :, i] = D1_em
                     stop_crit = np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') /np.linalg.norm(D1_em_save[:, :, i - 1], 'fro')
+                    print(f"Iteration {i + 1}: stop criterion = {stop_crit:.4f}, alpha = {alpha:.4f}, factor = {hyperparam[param]:.1f}")
+                              
 
-
-                    if alpha < upper_alpha and stop_crit < 1e-2:
+                    if alpha < upper_alpha and stop_crit < prec:
                         alpha *= hyperparam[param] # increase alpha
 
                     #alpha *= hyperparam[param]
 
 
-                    #D1_em = A.detach().cpu().numpy()
+                    
 
-                    D1_em_save[:, :, i] = D1_em
+                    
                     Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
                     charac_dag = float(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
 
+                    
+
                     if i > 0:
-                        if stop_crit < prec and charac_dag < prec:
+                        if stop_crit < prec and charac_dag < prec_dag:
                             print(f"EM converged after iteration {i + 1}")
                             print(f"final alpha = {alpha}")
                             break
 
                 tEnd = time.perf_counter() - tStart
 
-                #D1_em[np.abs(D1_em) < w_threshold] = 0
+                D1_em[D1_em < w_threshold] = 0
                 D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
                 D1_em_final = D1_em
 
                 threshold = 1e-4
                 D1_binary = np.abs(D1) >= threshold
                 D1_em_binary = np.abs(D1_em) >= threshold
+
+                TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
+                print(f"Is it a real DAG: {nx.is_directed_acyclic_graph(TestDAG)}")
+
+                print(f"Final D1_em: {D1_em_final}")
+                print(f"Final D1: {D1}")
+                print(f"alpha: {alpha})")
 
                 TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
                 #RMSE = np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro')
@@ -249,7 +267,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "dagraphem_adam_numpy_1e4_alpha_k2000.csv"
+    csv_path = "dagraphem_adam_numpy_1e4_alpha_k500.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")

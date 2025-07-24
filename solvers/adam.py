@@ -38,6 +38,8 @@ def adam(grad, x, callback=None, num_iters=200, step_size=0.001, clip=1.0, clip_
         vhat = v / (1 - b2 ** (i + 1))
         x = x - step_size * mhat / (np.sqrt(vhat) + eps)
 
+        #x[np.abs(x) < 1e-4] = 0
+
         #if i % 100 == 0:
         #    print(f"Iteration {i}, gradient norm {grad_norm:.2e}, step size: {step_size:.2e}")
         #    print(f"matrix A: {x}")
@@ -90,10 +92,10 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
         vhat = v / (1 - b2 ** (i + 1))
         x = x - step_size * mhat / (np.sqrt(vhat) + eps)
 
-        if (i+1) % 100 == 0:
-            print(f"Iteration {i+1}, gradient norm {grad_norm:.2e}, step size: {step_size:.2e}")
-            print(f"matrix A: {x}")
-            print(f"alpha: {alpha}")
+        #if (i+1) % 100 == 0:
+        #    print(f"Iteration {i+1}, gradient norm {grad_norm:.2e}, step size: {step_size:.2e}")
+        #    print(f"matrix A: {x}")
+        #    print(f"alpha: {alpha}")
 
         if grad_norm < 1e-3 and step_size < 1e-1:
             step_size *= 1.1

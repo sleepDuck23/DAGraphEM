@@ -55,11 +55,11 @@ if __name__ == "__main__":
     num_adam_steps = 1000
     lambda_reg = 20
     alpha = 1
-    factor_alpha = 1.5 # factor to increase alpha
+    factor_alpha = 10 # factor to increase alpha
     stepsize = 1e-4
     upper_alpha = 1e15  # upper bound for alpha
 
-    w_threshold = 1e-4  # threshold to eliminate small weights
+    w_threshold = 1e-2  # threshold to eliminate small weights
     
 
     reg = {}
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         spectral_norm = []
         Nit_em = 50  # number of iterations maximum for EM loop
         prec = 1e-4  # precision for EM loop
-        prec_DAG = 1e-9
+        prec_DAG = 1e-12
         grad_norm_threshold = 1e-5  # threshold for gradient norm
 
         tStart = time.perf_counter() 
@@ -184,7 +184,7 @@ if __name__ == "__main__":
             spectral_norm.append(np.linalg.norm(D1_em,ord=2))
 
             stop_crit = np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') /np.linalg.norm(D1_em_save[:, :, i - 1], 'fro')
-
+            print(f"Iteration {i + 1}: stop criterion = {stop_crit:.4f}, loss = {dagness:.4f}, alpha = {alpha:.4f}")
             if alpha < upper_alpha and stop_crit < 1e-2:
                 alpha *= factor_alpha # increase alpha
 
@@ -206,7 +206,7 @@ if __name__ == "__main__":
 
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
-
+        
         print(f"Final D1_em: {D1_em_final}")
 
         print(f"True graph: {D1}")

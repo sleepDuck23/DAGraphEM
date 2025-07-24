@@ -21,7 +21,7 @@ if __name__ == "__main__":
     K = 500  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(20, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -34,6 +34,8 @@ if __name__ == "__main__":
     sigma_P = 0.0001  # prior state std
     P0 = sigma_P**2 * np.eye(Nz)
     z0 = np.ones((Nz, 1))
+
+    Q_inv = np.linalg.inv(Q)
 
 
     reg1 = 113
@@ -98,7 +100,7 @@ if __name__ == "__main__":
             
         #D1_em, _ = adam(grad_fn, D1_em,step_size=1e-4, num_iters=1000)
 
-        grad_fn  = lambda D1_em, alpha: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
+        grad_fn  = lambda D1_em, alpha: compute_loss_gradient(D1_em,Q_inv,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
 
             
         D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-4, num_iters=500,clip=100,clip_flag=True)
