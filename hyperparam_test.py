@@ -24,7 +24,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [1.0 , 1.5, 2.0, 5.0, 10.0]
+    hyperparam = [1, 1.5, 2, 5, 7]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -84,15 +84,15 @@ if __name__ == "__main__":
                 D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
                 Nit_em = 50
                 prec = 1e-2
-                prec_dag = 1e-12
-                w_threshold = 1e-4
+                prec_dag = 1e-15
+                w_threshold = 1e-10
                 num_adam_steps = 1000
                 stepsize = 1e-4
                 num_lbfgs_steps = 100
                 lambda_reg = 10
                 alpha = 1
                 alpha_factor = 1
-                upper_alpha = 1e12
+                upper_alpha = 1e18
                 D1_em_save = np.zeros((Nz, Nz, Nit_em))
 
                 tStart = time.perf_counter() 
@@ -187,13 +187,23 @@ if __name__ == "__main__":
 
                     D1_em_save[:, :, i] = D1_em
                     stop_crit = np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') /np.linalg.norm(D1_em_save[:, :, i - 1], 'fro')
-                    print(f"Iteration {i + 1}: stop criterion = {stop_crit:.4f}, alpha = {alpha:.4f}, factor = {hyperparam[param]:.1f}")
+                    
+                    if i % 10 == 0:
+                        print(f"Iteration {i + 1}: stop criterion = {stop_crit:.4f}, alpha = {alpha:.4f}")
                               
 
-                    if alpha < upper_alpha and stop_crit < prec:
-                        alpha *= hyperparam[param] # increase alpha
+                    #if (stop_crit < prec or i>20) and alpha < upper_alpha:
+                    #    if hyperparam[param] == 1:
+                    #        alpha *= 10
+                    #    elif hyperparam[param] == 2:
+                    #        alpha *= 2*alpha
+                    #    elif hyperparam[param] == 3:
+                    #        alpha = 2*np.log(alpha+1)
+                    #    elif hyperparam[param] == 4:
+                    #        alpha = 2*np.log(alpha+1) + 0.5*np.log(np.linalg.norm(D1_em, 'fro') + 1)
 
-                    #alpha *= hyperparam[param]
+                    if stop_crit < prec and alpha < upper_alpha:
+                        alpha *= hyperparam[param]
 
 
                     
@@ -216,16 +226,16 @@ if __name__ == "__main__":
                 D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
                 D1_em_final = D1_em
 
-                threshold = 1e-4
+                threshold = 1e-10
                 D1_binary = np.abs(D1) >= threshold
                 D1_em_binary = np.abs(D1_em) >= threshold
 
                 TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
                 print(f"Is it a real DAG: {nx.is_directed_acyclic_graph(TestDAG)}")
 
-                print(f"Final D1_em: {D1_em_final}")
-                print(f"Final D1: {D1}")
-                print(f"alpha: {alpha})")
+                #print(f"Final D1_em: {D1_em_final}")
+                #print(f"Final D1: {D1}")
+                #print(f"alpha: {alpha})")
 
                 TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
                 #RMSE = np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro')
@@ -267,7 +277,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "dagraphem_adam_numpy_1e4_alpha_k500.csv"
+    csv_path = "dagraphem_adam_numpy_1e10_alpha_k500_2.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
