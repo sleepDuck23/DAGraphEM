@@ -24,7 +24,7 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [1, 1.5, 2, 5, 7]
+    hyperparam = [10]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -52,7 +52,7 @@ if __name__ == "__main__":
             for seeds in random_seed:
                 print(f"---- Seed: {seeds} ----")
 
-                K = 500
+                K = 2000
                 flag_plot = 0
 
                 D1, Graph = generate_random_DAG(nodes_size[nodex], graph_type='ER', edge_prob=0.2, seed=seeds)
@@ -168,7 +168,7 @@ if __name__ == "__main__":
                     #    C_torch = numpy_to_torch(C).to(device)
                     #    Phi_torch = numpy_to_torch(Phi).to(device)
                     #    A.data = A.data.to(device)
-                    #    loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, hyperparam[param], alpha) 
+                    #    loss = compute_new_loss(A, K, Q_inv_torch, Sigma_torch, C_torch, Phi_torch, lambda_reg, alpha) 
                     #    if not torch.isfinite(loss):
                     #        print("Non-finite loss encountered in closure")
                     #        return loss
@@ -181,6 +181,8 @@ if __name__ == "__main__":
                     #    optimizer.step(closure)
 
                     #D1_em = A.detach().cpu().numpy()
+
+                    
                     #running adam solver builded in this code:
                     grad_loss = lambda D1_em: grad_newloss(D1_em,K,Q_inv,Sigma,C,Phi,lambda_reg,alpha)
                     D1_em,_ = adam(grad_loss, D1_em,step_size=stepsize, num_iters=num_adam_steps, callback=None)
@@ -277,7 +279,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "dagraphem_adam_numpy_1e10_alpha_k500_2.csv"
+    csv_path = "dagraphem_adam_numpy_alpha_1e10_10_k2000.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
