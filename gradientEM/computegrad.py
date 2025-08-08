@@ -96,6 +96,7 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
     grad_A_mu = np.kron(z0, np.eye(Nx)) 
     grad_A_sig = 2 * np.kron(P0 @ A.T, np.eye(Nx)) @ Nm
     grad_A_phik = np.zeros((Nx**2, K))
+    print(f"Initial grad_A_mu shape: {grad_A_mu.shape}, grad_A_sig shape: {grad_A_sig.shape}, grad_A_phik shape: {grad_A_phik.shape}")
 
     # First step
     z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update(
@@ -142,6 +143,8 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
     dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx)).T + grad_penalty
 
     dphi = dphiA.flatten()
+
+    print(f"shape dphiA: {dphiA.shape}")
 
     return phi, dphi, dphiA
 
