@@ -61,6 +61,8 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
     for i in range(num_iters):
         g = grad(x,alpha)
 
+        print(f"gradient: {g}")
+
         # shape check 
         if g.shape != x.shape:
             raise ValueError(f"Gradient shape mismatch! Expected {x.shape}, but got {g.shape}. "
@@ -102,3 +104,4 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
         elif grad_norm > 1e4 and step_size > 1e-10:
             step_size *= 0.9
     return x, grad_norm
+

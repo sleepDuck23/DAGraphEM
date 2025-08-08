@@ -7,6 +7,7 @@ from tools.loss import Compute_PhiK_torch, Compute_PhiK
 from tools.dag import grad_desc_penalty, grad_desc_penalty_torch
 from tools.dag import numpy_to_torch
 
+
 def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
     Sk_inv = np.linalg.pinv(Sk)
     Nx = A.shape[0]
