@@ -61,7 +61,7 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
     for i in range(num_iters):
         g = grad(x,alpha)
 
-        print(f"gradient: {g}")
+        #print(f"gradient: {g}")
 
         # shape check 
         if g.shape != x.shape:
@@ -76,6 +76,7 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
 
         if grad_norm < 1e2:
             alpha = min(alpha * 5, 1e12)
+            print(f"alpha: {alpha}")
 
         
         if grad_norm > clip and clip_flag:

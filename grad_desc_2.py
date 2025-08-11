@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import os
 import time
 import networkx as nx
-import torch
 from scipy.linalg import expm
 
 from tools.matrix import calError
@@ -14,7 +13,7 @@ from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_upd
 from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
 from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
-from gradientEM.computegrad import compute_loss_gradient
+from gradientEM.computegrad import compute_loss_gradient, run_kalman_full, compute_loss_gradient_v2
 from solvers.adam import adam, adam_alpha
 
 if __name__ == "__main__":
@@ -44,6 +43,7 @@ if __name__ == "__main__":
     alpha = 1
     factor_alpha = 1.1
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
+    max_outer_iters = 10 
     
 
     reg = {}
@@ -62,6 +62,15 @@ if __name__ == "__main__":
     specificity = np.zeros(Nreal)
     F1score = np.zeros(Nreal)
     saveX = np.zeros((Nx, K, Nreal))
+
+    def grad_fn_fast(A_var, alpha_in):
+        # A_var is a matrix (Nx, Nx)
+        
+        _, dphiA = compute_loss_gradient_v2(
+            A_var, A_kf, kf_results, z0, P0, D2, Nx, Nz, K,
+            lambda_reg=lambda_reg, alpha=alpha_in, delta=1e-4
+        )
+        return dphiA
 
 
     for real in range(Nreal):
@@ -96,14 +105,20 @@ if __name__ == "__main__":
         yk_kalman_em = np.zeros((Nx, K))
         Sk_kalman_em = np.zeros((Nx, Nx, K))
 
-        #grad_fn  = lambda D1_em: compute_loss_gradient(D1_em,Q,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
-            
-        #D1_em, _ = adam(grad_fn, D1_em,step_size=1e-4, num_iters=1000)
+        for outer_iter in range(max_outer_iters):
+            print(f"Outer iteration {outer_iter + 1}/{max_outer_iters}")
 
-        grad_fn  = lambda D1_em, alpha: compute_loss_gradient(D1_em,Q_inv,x,z0,P0,D2,R,Nx,Nz,K,lambda_reg,alpha)[2]
+            # 1) Outer Kalman pass using the current D1_em (A_kf)
+            A_kf = D1_em.copy()
+            
+            kf_results = run_kalman_full(A_kf, Q, x, z0, P0, D2, R, Nx, Nz, K)
+            
+
+            # Run a few Adam steps (inner loop). adam_alpha expects x to be the same shape as gradient.
+            D1_em, _ = adam_alpha(grad_fn_fast, D1_em, alpha, step_size=1e-4, num_iters=100, clip=100, clip_flag=False)
+
         
-        D1_em, _ = adam_alpha(grad_fn, D1_em, alpha, step_size=1e-4, num_iters=10,clip=100,clip_flag=False)
-        
+
 
         tEnd[real] = time.perf_counter() - tStart
 

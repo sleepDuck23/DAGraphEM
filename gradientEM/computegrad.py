@@ -16,6 +16,7 @@ def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
     Jk = A @ Kk # Nx,Nx
     Lk = A - Jk @ H # Nx,Nx
 
+
     term1 = grad_A_mu_in @ Lk.T # Nx**2, Nx
 
     term2 = grad_A_sig @  np.kron((H.T @ wk).reshape(-1, 1), np.ascontiguousarray(Lk.T)) # Nx**2, Nx
@@ -96,7 +97,6 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
     grad_A_mu = np.kron(z0, np.eye(Nx)) 
     grad_A_sig = 2 * np.kron(P0 @ A.T, np.eye(Nx)) @ Nm
     grad_A_phik = np.zeros((Nx**2, K))
-    print(f"Initial grad_A_mu shape: {grad_A_mu.shape}, grad_A_sig shape: {grad_A_sig.shape}, grad_A_phik shape: {grad_A_phik.shape}")
 
     # First step
     z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update(
@@ -144,8 +144,99 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
 
     dphi = dphiA.flatten()
 
-    print(f"shape dphiA: {dphiA.shape}")
-
     return phi, dphi, dphiA
 
+def run_kalman_full(A_kf, Q, x_data, z0, P0, H, R, Nx, Nz, K):
+   
+    # allocate
+    yk_kalman_em = np.zeros((Nx, K))
+    Sk_kalman_em = np.zeros((Nx, Nx, K))
+    z_mean_kalman_em = np.zeros((Nz, K))
+    Pk_minus = np.zeros((Nx, Nx, K))
+    Kk = np.zeros((Nx, Nz, K))
+
+    # first step
+    z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update(
+        x_data[:, 0:1], z0, P0, A_kf, H, R, Q
+    )
+
+    z_mean_kalman_em[:, 0] = z_mean_t0.squeeze()
+    yk_kalman_em[:, 0] = yk_t0.squeeze()
+    Sk_kalman_em[:, :, 0] = Sk_t0
+    Pk_minus[:, :, 0] = Pk_minus_t0
+    Kk[:, :, 0] = Kk_t0
+
+    P_prev = P_t0
+
+    for k in range(1, K):
+        x_k = x_data[:, k:k+1]
+        z_mean_tk, P_tk, yk_tk, Sk_tk, Pk_minus_tk, Kk_tk = Kalman_update(
+            x_k, z_mean_kalman_em[:, k-1:k], P_prev, A_kf, H, R, Q
+        )
+
+        z_mean_kalman_em[:, k] = z_mean_tk.squeeze()
+        yk_kalman_em[:, k] = yk_tk.squeeze()
+        Sk_kalman_em[:, :, k] = Sk_tk
+        Pk_minus[:, :, k] = Pk_minus_tk
+        Kk[:, :, k] = Kk_tk
+        P_prev = P_tk
+
+    return {
+        "yk": yk_kalman_em,
+        "Sk": Sk_kalman_em,
+        "Pk_minus": Pk_minus,
+        "Kk": Kk,
+        "z_mean": z_mean_kalman_em
+    }
+
+
+def compute_loss_gradient_v2(
+    A_current,
+    A_kf,
+    kf_results,
+    z0, P0, H,
+    Nx, Nz, K,
+    lambda_reg=20, alpha=1, delta=1e-4
+):
+
+    yk_kalman_em = kf_results["yk"]
+    Sk_kalman_em = kf_results["Sk"]
+    Pk_minus = kf_results["Pk_minus"]
+    Kk = kf_results["Kk"]
+    z_mean_kalman_em = kf_results["z_mean"]
+
+    # symmetric commutation projection
+    Kom = commutmatrix(Nx, Nx)
+    Nm = (np.eye(Nx**2) + Kom) / 2
+
+    # initial gradients — initialize consistently with A_kf (the one used by KF)
+    grad_A_mu = np.kron(z0, np.eye(Nx))                           # (Nx^2, Nx)
+    grad_A_sig = 2 * np.kron(P0 @ A_kf.T, np.eye(Nx)) @ Nm                    # (Nx^2, Nx^2)
+    grad_A_phik = np.zeros((Nx**2, K))
+
+    # recursion over stored time steps (use A_current when propagating gradient states)
+    for k in range(K):
+        yk = yk_kalman_em[:, k]
+        Sk = Sk_kalman_em[:, :, k]
+        Pk_m = Pk_minus[:, :, k]
+        Kk_t = Kk[:, :, k]
+        zmean = z_mean_kalman_em[:, k]
+
+        # gradient contribution for time k
+        # gradient_A_phik returns shape (Nx^2, 1) in your earlier code
+        grad_A_phik[:, k] = gradient_A_phik(grad_A_mu, H, yk, Sk, grad_A_sig).reshape(-1)
+
+        # update recurrent gradient states but using A_current (variable we optimize)
+        grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A_current, H, Sk, yk, Kk_t, zmean)
+        grad_A_sig = gradient_A_sig(grad_A_sig, A_current, H, Pk_m, Kk_t)
+
+    # penalty computed at A_current
+    penalty, grad_penalty = grad_desc_penalty(A_current, lambda_reg, alpha, delta)
+
+    # likelihood part uses stored Sk, yk (computed with A_kf)
+    phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em) + penalty
+
+    dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx)).T + grad_penalty
+
+    return phi, dphiA
 
