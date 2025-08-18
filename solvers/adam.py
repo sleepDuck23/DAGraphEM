@@ -75,8 +75,8 @@ def adam_alpha(grad, x, alpha, callback=None, num_iters=200, step_size=0.001, cl
         grad_norm = np.linalg.norm(g) 
 
         if grad_norm < 1e2:
-            alpha = min(alpha * 5, 1e12)
-            print(f"alpha: {alpha}")
+            alpha = min(alpha * 5, 1e5)
+            
 
         
         if grad_norm > clip and clip_flag:

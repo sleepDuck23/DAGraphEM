@@ -17,7 +17,7 @@ from gradientEM.computegrad import compute_loss_gradient, run_kalman_full, compu
 from solvers.adam import adam, adam_alpha
 
 if __name__ == "__main__":
-    K = 100  # length of time series
+    K = 500  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
     D1, Graph = generate_random_DAG(4, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
@@ -37,14 +37,23 @@ if __name__ == "__main__":
     Q_inv = np.linalg.inv(Q)
 
 
-    reg1 = 113
+    reg1 = 1
     gamma1 = 20
-    lambda_reg = 15
+    lambda_reg = 1
     alpha = 1
     factor_alpha = 1.1
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
-    max_outer_iters = 10 
+    max_outer_iters = 20
     
+    kf_change_log = {
+        "yk": [],
+        "Sk": [],
+        "Pk_minus": [],
+        "Kk": [],
+        "z_mean": []
+    }
+
+    kf_results_prev = None
 
     reg = {}
     reg['reg1'] = reg1
@@ -112,10 +121,25 @@ if __name__ == "__main__":
             A_kf = D1_em.copy()
             
             kf_results = run_kalman_full(A_kf, Q, x, z0, P0, D2, R, Nx, Nz, K)
+
+                    # Compare with previous iteration
+            if kf_results_prev is not None:
+                kf_change_log["yk"].append(np.linalg.norm(kf_results["yk"] - kf_results_prev["yk"]))
+                kf_change_log["Sk"].append(np.linalg.norm(kf_results["Sk"] - kf_results_prev["Sk"]))
+                kf_change_log["Pk_minus"].append(np.linalg.norm(kf_results["Pk_minus"] - kf_results_prev["Pk_minus"]))
+                kf_change_log["Kk"].append(np.linalg.norm(kf_results["Kk"] - kf_results_prev["Kk"]))
+                kf_change_log["z_mean"].append(np.linalg.norm(kf_results["z_mean"] - kf_results_prev["z_mean"]))
+            else:
+                # First iteration has no previous to compare
+                for key in kf_change_log.keys():
+                    kf_change_log[key].append(0.0)
+
+            # Store for next iteration
+            kf_results_prev = {k: v.copy() for k, v in kf_results.items()}
             
 
             # Run a few Adam steps (inner loop). adam_alpha expects x to be the same shape as gradient.
-            D1_em, _ = adam_alpha(grad_fn_fast, D1_em, alpha, step_size=1e-4, num_iters=100, clip=100, clip_flag=False)
+            D1_em, _ = adam_alpha(grad_fn_fast, D1_em, alpha, step_size=1e-4, num_iters=50)
 
         
 
@@ -194,4 +218,15 @@ if __name__ == "__main__":
         plt.colorbar()
         plt.title('Estimated D1')
         plt.axis('off')
+        plt.show()
+
+
+        plt.figure(figsize=(8,5))
+        for var, values in kf_change_log.items():
+            plt.plot(values, label=var)
+        plt.yscale("log")
+        plt.xlabel("Outer Iteration")
+        plt.ylabel("Change Norm (log scale)")
+        plt.title("Change in Kalman filter variables per iteration")
+        plt.legend()
         plt.show()

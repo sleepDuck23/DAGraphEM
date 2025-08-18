@@ -29,7 +29,7 @@ if __name__ == "__main__":
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(3, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99))# Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(15, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99))# Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
         Err_D1 = []
         Nit_em = 50  # number of iterations maximum for EM loop
-        prec = 1e-4  # precision for EM loop
+        prec = 1e-2  # precision for EM loop
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
@@ -202,6 +202,7 @@ if __name__ == "__main__":
         nx.draw(G_est, pos, width=linewidths_est, with_labels=False, node_size=30, arrowsize=10)
         plt.title('Estimated D1 Network')
         plt.tight_layout()
+        plt.savefig('graph_D1_estimated_vs_true_15dim_reg1.png', dpi=300)
         plt.show()
 
         precision[real] = TP / (TP + FP + 1e-8)
@@ -238,6 +239,7 @@ if __name__ == "__main__":
         plt.colorbar()
         plt.title('Estimated D1')
         plt.axis('off')
+        plt.savefig('hotmap_D1_estimated_vs_true_15dim_reg1.png',dpi =300)
         plt.show()
 
         plt.figure(3)
