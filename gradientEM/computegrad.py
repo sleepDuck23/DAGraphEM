@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import time
 
 from gradientEM.comutation import commutmatrix, commutmatrix_torch
 from tools.EM import Kalman_update_torch, Kalman_update
@@ -81,7 +82,6 @@ def gradient_A_phik(grad_A_mu, H, vk, Sk, grad_A_sig):
 
 
 def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1,delta=1e-4):
-    
     Kom = commutmatrix(Nx, Nx)
     Nm = (np.eye(Nx**2) + Kom) / 2
 
@@ -98,9 +98,14 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
     grad_A_sig = 2 * np.kron(P0 @ A.T, np.eye(Nx)) @ Nm
     grad_A_phik = np.zeros((Nx**2, K))
 
+    
+
+    tkf_init = time.perf_counter()
+
     # First step
     z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update(
         x[:, 0:1], z0, P0, A, H, R, Q)
+    
     
     
     # Assign to storage:
@@ -112,10 +117,12 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
     Kk[:, :, 0] = Kk_t0
 
     # These gradient functions expect 1D vectors for yk and xk_mean_new (which are yk_kalman_em[:, k] and z_mean_kalman_em[:, k] respectively)
-
+    
     grad_A_phik[:, 0] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], grad_A_sig)
     grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, 0], yk_kalman_em[:, 0], Kk[:, :, 0], z_mean_kalman_em[:, 0])
     grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, 0], Kk[:, :, 0])
+
+    
 
     # Loop over time steps
     for k in range(1, K):
@@ -131,9 +138,15 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
         Pk_minus[:, :, k] = Pk_minus_tk
         Kk[:, :, k] = Kk_tk
 
+        
         grad_A_phik[:, k] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, k], Sk_kalman_em[:, :, k], grad_A_sig)
         grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, k], yk_kalman_em[:, k], Kk[:, :, k], z_mean_kalman_em[:, k])
         grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, k], Kk[:, :, k])
+        
+
+    tgrad = time.perf_counter() - tkf_init
+
+    print(f"Total time for kalman filter: {tgrad:.4f} seconds")
 
         
     penalty, grad_penalty = grad_desc_penalty(A,lambda_reg,alpha,delta)

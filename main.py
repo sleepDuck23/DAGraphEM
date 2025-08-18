@@ -29,7 +29,7 @@ if __name__ == "__main__":
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(15, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99))# Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(4, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99))# Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -97,11 +97,14 @@ if __name__ == "__main__":
             yk_kalman_em = np.zeros((Nx, K))
             Sk_kalman_em = np.zeros((Nx, Nx, K))
 
+            tkf_init = time.perf_counter()
+
             x_k_initial = x[:, 0].reshape(-1, 1)  # Reshape to a column vector
             z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0],_,_ = \
                 Kalman_update(x_k_initial, z0, P0, D1_em, D2, R, Q)
             z_mean_kalman_em[:, 0] = z_mean_kalman_em_temp.flatten()
             yk_kalman_em[:, 0] = yk_kalman_em_temp.flatten()
+            
 
             for k in range(1, K):
                 x_k = x[:, k].reshape(-1, 1)      # Reshape each observation
@@ -109,6 +112,9 @@ if __name__ == "__main__":
                     Kalman_update(x_k, z_mean_kalman_em[:, k - 1].reshape(-1, 1), P_kalman_em[:, :, k - 1], D1_em, D2, R, Q)
                 z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
                 yk_kalman_em[:, k] = yk_kalman_em_temp.flatten()
+
+            tkf = time.perf_counter() - tkf_init
+            print(f"Time for Kalman filter: {tkf:.4f} seconds")
 
             # compute loss function (ML for now, no prior)
             PhiK[i] = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
@@ -120,6 +126,7 @@ if __name__ == "__main__":
             PhiK[i] = PhiK[i] + Reg_before  # update loss function
 
             # 2/ Kalman smoother
+            tinit_smooth = time.perf_counter() 
             z_mean_smooth_em = np.zeros((Nz, K))
             P_smooth_em = np.zeros((Nz, Nz, K))
             G_smooth_em = np.zeros((Nz, Nz, K))
@@ -132,6 +139,8 @@ if __name__ == "__main__":
             z_mean_smooth0_em, P_smooth0_em, G_smooth0_em = \
                 Smoothing_update(z0, P0, z_mean_smooth_em[:, 0].reshape(-1, 1), P_smooth_em[:, :, 0], D1_em, D2, R, Q)
 
+            tsmooth  = time.perf_counter() - tinit_smooth
+            print(f"Time for smoothing: {tsmooth:.4f} seconds")
 
             # compute EM parameters
             Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
