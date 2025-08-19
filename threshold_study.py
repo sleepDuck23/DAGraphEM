@@ -19,7 +19,7 @@ from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1,
 from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss, compute_loss_zero, grad_newloss
 from solvers.adam import adam
 
-nodes_size = [10, 15]
+nodes_size = [7, 10, 15, 20]
 random_seed = np.linspace(40, 50, num=10, dtype=int)  # Random seeds for reproducibility
 roc_results = []
 
@@ -281,5 +281,5 @@ plt.title("Mean ± Std of Accuracy and F1 vs. w_threshold by Node Size")
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("roc_mean_std_w_threshold.png", dpi=300)
+plt.savefig("roc_mean_std_w_threshold_1e1.png", dpi=300)
 plt.show()
