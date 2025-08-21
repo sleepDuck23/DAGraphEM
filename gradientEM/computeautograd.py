@@ -9,8 +9,8 @@ from tools.dag import grad_desc_penalty, grad_desc_penalty_torch
 from tools.dag import numpy_to_torch
 
 
-def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
-    Sk_inv = np.linalg.pinv(Sk)
+def gradient_A_mu_torch(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
+    Sk_inv = torch.linalg.pinv(Sk)
     Nx = A.shape[0]
 
     wk = Sk_inv @ vk # Nx,1
@@ -20,16 +20,16 @@ def gradient_A_mu(grad_A_mu_in, grad_A_sig, A, H, Sk, vk, Kk, xk_mean_new):
 
     term1 = grad_A_mu_in @ Lk.T # Nx**2, Nx
 
-    term2 = grad_A_sig @  np.kron((H.T @ wk).reshape(-1, 1), np.ascontiguousarray(Lk.T)) # Nx**2, Nx
+    term2 = grad_A_sig @  torch.kron((H.T @ wk).reshape(-1, 1), Lk.T.contiguous()) # Nx**2, Nx
 
-    term3 = np.kron(xk_mean_new.reshape(-1, 1), np.eye(Nx))  # Nx**2, Nx
+    term3 = torch.kron(xk_mean_new.reshape(-1, 1), torch.eye(Nx))  # Nx**2, Nx
 
     grad_A_mu_new = term1 + term2 + term3
 
     return grad_A_mu_new
 
 
-def gradient_A_sig(grad_A_sig_in, A, H, Pk_minus, Kk):
+def gradient_A_sig_torch(grad_A_sig_in, A, H, Pk_minus, Kk):
   """
   Computes the updated gradient of A with respect to sigma (covariance).
 
@@ -48,13 +48,13 @@ def gradient_A_sig(grad_A_sig_in, A, H, Pk_minus, Kk):
   Lk = A - Jk @ H # Nx,Nx
   Nx = A.shape[0]  # Get the number of rows of A
 
-  Kom = commutmatrix(Nx, Nx)
+  Kom = commutmatrix_torch(Nx, Nx)
 
-  Nm = (np.eye(Nx**2) + Kom) / 2 # Nx**2,Nx**2
+  Nm = (torch.eye(Nx**2) + Kom) / 2 # Nx**2,Nx**2
 
-  term1 = grad_A_sig_in @ np.kron(Lk.T, Lk.T) # Nx**2,Nx**2
+  term1 = grad_A_sig_in @ torch.kron(Lk.T, Lk.T) # Nx**2,Nx**2
 
-  term2 = 2 * np.kron(Pk_minus @ Lk.T, np.eye(Nx)) @ Nm # Nx**2,Nx**2
+  term2 = 2 * torch.kron(Pk_minus @ Lk.T, torch.eye(Nx)) @ Nm # Nx**2,Nx**2
 
   grad_A_sig_new = term1 + term2
 
@@ -62,13 +62,13 @@ def gradient_A_sig(grad_A_sig_in, A, H, Pk_minus, Kk):
 
 
 
-def gradient_A_phik(grad_A_mu, H, vk, Sk, grad_A_sig):
+def gradient_A_phik_torch(grad_A_mu, H, vk, Sk, grad_A_sig):
     # Compute pseudo-inverse of Sk
-    Sk_inv = np.linalg.pinv(Sk) # Nx,Nx
+    Sk_inv = torch.linalg.pinv(Sk) # Nx,Nx
     
     # Compute wk and Mk
     wk = Sk_inv @ vk # vk is (Nx,) in your use case # Nx,1
-    Mk = np.outer(wk, wk) - Sk_inv # torch.outer with 1D vector returns 2D matrix #Nx,Nx
+    Mk = torch.outer(wk, wk) - Sk_inv # torch.outer with 1D vector returns 2D matrix #Nx,Nx
     
     # Compute temp = H' * Mk * H
     temp = H.T @ Mk @ H # Nx,Nx
@@ -81,29 +81,29 @@ def gradient_A_phik(grad_A_mu, H, vk, Sk, grad_A_sig):
 
 
 
-def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1,delta=1e-4):
-    Kom = commutmatrix(Nx, Nx)
-    Nm = (np.eye(Nx**2) + Kom) / 2
+def compute_loss_gradient_torch(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1,delta=1e-4):
+    Kom = commutmatrix_torch(Nx, Nx)
+    Nm = (torch.eye(Nx**2) + Kom) / 2
 
     # Initialize storage
-    z_mean_kalman_em = np.zeros((Nz, K))
-    P_kalman_em = np.zeros((Nz, Nz, K))
-    yk_kalman_em = np.zeros((Nx, K)) 
-    Sk_kalman_em = np.zeros((Nx, Nx, K))
+    z_mean_kalman_em = torch.zeros((Nz, K))
+    P_kalman_em = torch.zeros((Nz, Nz, K))
+    yk_kalman_em = torch.zeros((Nx, K)) 
+    Sk_kalman_em = torch.zeros((Nx, Nx, K))
 
-    Pk_minus = np.zeros((Nx, Nx, K))
-    Kk = np.zeros((Nx, Nz, K))
+    Pk_minus = torch.zeros((Nx, Nx, K))
+    Kk = torch.zeros((Nx, Nz, K))
 
-    grad_A_mu = np.kron(z0, np.eye(Nx)) 
-    grad_A_sig = 2 * np.kron(P0 @ A.T, np.eye(Nx)) @ Nm
-    grad_A_phik = np.zeros((Nx**2, K))
+    grad_A_mu = torch.kron(z0, torch.eye(Nx)) 
+    grad_A_sig = 2 * torch.kron(P0 @ A.T, torch.eye(Nx)) @ Nm
+    grad_A_phik = torch.zeros((Nx**2, K))
 
     
 
     tkf_init = time.perf_counter()
 
     # First step
-    z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update(
+    z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update_torch(
         x[:, 0:1], z0, P0, A, H, R, Q)
     
     
@@ -118,16 +118,16 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
 
     # These gradient functions expect 1D vectors for yk and xk_mean_new (which are yk_kalman_em[:, k] and z_mean_kalman_em[:, k] respectively)
     
-    grad_A_phik[:, 0] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], grad_A_sig)
-    grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, 0], yk_kalman_em[:, 0], Kk[:, :, 0], z_mean_kalman_em[:, 0])
-    grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, 0], Kk[:, :, 0])
+    grad_A_phik[:, 0] = gradient_A_phik_torch(grad_A_mu, H, yk_kalman_em[:, 0], Sk_kalman_em[:, :, 0], grad_A_sig)
+    grad_A_mu = gradient_A_mu_torch(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, 0], yk_kalman_em[:, 0], Kk[:, :, 0], z_mean_kalman_em[:, 0])
+    grad_A_sig = gradient_A_sig_torch(grad_A_sig, A, H, Pk_minus[:, :, 0], Kk[:, :, 0])
 
     
 
     # Loop over time steps
     for k in range(1, K):
         x_k = x[:, k].reshape(-1, 1) 
-        z_mean_tk, P_tk, yk_tk, Sk_tk, Pk_minus_tk, Kk_tk = Kalman_update(
+        z_mean_tk, P_tk, yk_tk, Sk_tk, Pk_minus_tk, Kk_tk = Kalman_update_torch(
             x_k, z_mean_kalman_em[:, k-1:k], P_kalman_em[:, :, k-1], A, H, R, Q)
 
         # Assign back to storage, squeezing the column vectors to fit the 1D slices
@@ -139,9 +139,9 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
         Kk[:, :, k] = Kk_tk
 
         
-        grad_A_phik[:, k] = gradient_A_phik(grad_A_mu, H, yk_kalman_em[:, k], Sk_kalman_em[:, :, k], grad_A_sig)
-        grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, k], yk_kalman_em[:, k], Kk[:, :, k], z_mean_kalman_em[:, k])
-        grad_A_sig = gradient_A_sig(grad_A_sig, A, H, Pk_minus[:, :, k], Kk[:, :, k])
+        grad_A_phik[:, k] = gradient_A_phik_torch(grad_A_mu, H, yk_kalman_em[:, k], Sk_kalman_em[:, :, k], grad_A_sig)
+        grad_A_mu = gradient_A_mu_torch(grad_A_mu, grad_A_sig, A, H, Sk_kalman_em[:, :, k], yk_kalman_em[:, k], Kk[:, :, k], z_mean_kalman_em[:, k])
+        grad_A_sig = gradient_A_sig_torch(grad_A_sig, A, H, Pk_minus[:, :, k], Kk[:, :, k])
         
 
     tgrad = time.perf_counter() - tkf_init
@@ -149,17 +149,17 @@ def compute_loss_gradient(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,alpha=1
     print(f"Total time for kalman filter: {tgrad:.4f} seconds")
 
         
-    penalty, grad_penalty = grad_desc_penalty(A,lambda_reg,alpha,delta)
+    penalty, grad_penalty = grad_desc_penalty_torch(A,lambda_reg,alpha,delta)
 
-    phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em) + penalty
+    phi = Compute_PhiK_torch(0, Sk_kalman_em, yk_kalman_em) + penalty
 
-    dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx)).T + grad_penalty
+    dphiA = -torch.reshape(torch.sum(grad_A_phik, axis=1), (Nx, Nx)).T + grad_penalty
 
     dphi = dphiA.flatten()
 
     return phi, dphi, dphiA
 
-def run_kalman_full(A_kf, Q, x_data, z0, P0, H, R, Nx, Nz, K):
+def run_kalman_full_torch(A_kf, Q, x_data, z0, P0, H, R, Nx, Nz, K):
    
     # allocate
     yk_kalman_em = np.zeros((Nx, K))
@@ -169,21 +169,22 @@ def run_kalman_full(A_kf, Q, x_data, z0, P0, H, R, Nx, Nz, K):
     Kk = np.zeros((Nx, Nz, K))
 
     # first step
-    z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update(
+    z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update_torch(
         x_data[:, 0:1], z0, P0, A_kf, H, R, Q
     )
 
-    z_mean_kalman_em[:, 0] = z_mean_t0.squeeze()
-    yk_kalman_em[:, 0] = yk_t0.squeeze()
-    Sk_kalman_em[:, :, 0] = Sk_t0
-    Pk_minus[:, :, 0] = Pk_minus_t0
-    Kk[:, :, 0] = Kk_t0
+    yk_kalman_em = torch.zeros((Nx, K), dtype=A_kf.dtype, device=A_kf.device)
+    Sk_kalman_em = torch.zeros((Nx, Nx, K), dtype=A_kf.dtype, device=A_kf.device)
+    z_mean_kalman_em = torch.zeros((Nz, K), dtype=A_kf.dtype, device=A_kf.device)
+    Pk_minus = torch.zeros((Nx, Nx, K), dtype=A_kf.dtype, device=A_kf.device)
+    Kk = torch.zeros((Nx, Nz, K), dtype=A_kf.dtype, device=A_kf.device)
+
 
     P_prev = P_t0
 
     for k in range(1, K):
         x_k = x_data[:, k:k+1]
-        z_mean_tk, P_tk, yk_tk, Sk_tk, Pk_minus_tk, Kk_tk = Kalman_update(
+        z_mean_tk, P_tk, yk_tk, Sk_tk, Pk_minus_tk, Kk_tk = Kalman_update_torch(
             x_k, z_mean_kalman_em[:, k-1:k], P_prev, A_kf, H, R, Q
         )
 
@@ -203,7 +204,7 @@ def run_kalman_full(A_kf, Q, x_data, z0, P0, H, R, Nx, Nz, K):
     }
 
 
-def compute_loss_gradient_v2(
+def compute_loss_gradient_v2_torch(
     A_current,
     A_kf,
     kf_results,
@@ -211,6 +212,8 @@ def compute_loss_gradient_v2(
     Nx, Nz, K,
     lambda_reg=20, alpha=1, delta=1e-4
 ):
+    
+    print("Starting compute_loss_gradient_v2_torch...")
 
     yk_kalman_em = kf_results["yk"]
     Sk_kalman_em = kf_results["Sk"]
@@ -219,13 +222,13 @@ def compute_loss_gradient_v2(
     z_mean_kalman_em = kf_results["z_mean"]
 
     # symmetric commutation projection
-    Kom = commutmatrix(Nx, Nx)
-    Nm = (np.eye(Nx**2) + Kom) / 2
+    Kom = commutmatrix_torch(Nx, Nx)
+    Nm = (torch.eye(Nx**2) + Kom) / 2
 
     # initial gradients — initialize consistently with A_kf (the one used by KF)
-    grad_A_mu = np.kron(z0, np.eye(Nx))                           # (Nx^2, Nx)
-    grad_A_sig = 2 * np.kron(P0 @ A_kf.T, np.eye(Nx)) @ Nm                    # (Nx^2, Nx^2)
-    grad_A_phik = np.zeros((Nx**2, K))
+    grad_A_mu = torch.kron(z0, torch.eye(Nx))                           # (Nx^2, Nx)
+    grad_A_sig = 2 * torch.kron(P0 @ A_kf.T, torch.eye(Nx)) @ Nm                    # (Nx^2, Nx^2)
+    grad_A_phik = torch.zeros((Nx**2, K))
 
     # recursion over stored time steps (use A_current when propagating gradient states)
     for k in range(K):
@@ -238,29 +241,54 @@ def compute_loss_gradient_v2(
         # gradient contribution for time k
         # gradient_A_phik returns shape (Nx^2, 1) in your earlier code
         tgrad_start = time.perf_counter()
-        grad_A_phik[:, k] = gradient_A_phik(grad_A_mu, H, yk, Sk, grad_A_sig).reshape(-1)
+        grad_A_phik[:, k] = gradient_A_phik_torch(grad_A_mu, H, yk, Sk, grad_A_sig).reshape(-1)
         tgrad_end = time.perf_counter() - tgrad_start
         print(f"Gradient gradient_A_phik computation for time step {k} took {tgrad_end} seconds")
 
         # update recurrent gradient states but using A_current (variable we optimize)
         tgrad_start = time.perf_counter()
-        grad_A_mu = gradient_A_mu(grad_A_mu, grad_A_sig, A_current, H, Sk, yk, Kk_t, zmean)
+        grad_A_mu = gradient_A_mu_torch(grad_A_mu, grad_A_sig, A_current, H, Sk, yk, Kk_t, zmean)
         tgrad_end = time.perf_counter() - tgrad_start
         print(f"Gradient gradient_A_mu computation for time step {k} took {tgrad_end} seconds")
 
 
         tgrad_start = time.perf_counter()
-        grad_A_sig = gradient_A_sig(grad_A_sig, A_current, H, Pk_m, Kk_t)
+        grad_A_sig = gradient_A_sig_torch(grad_A_sig, A_current, H, Pk_m, Kk_t)
         tgrad_end = time.perf_counter() - tgrad_start
         print(f"Gradient grad_A_sig computation for time step {k} took {tgrad_end} seconds")
 
     # penalty computed at A_current
-    penalty, grad_penalty = grad_desc_penalty(A_current, lambda_reg, alpha, delta)
+    penalty, grad_penalty = grad_desc_penalty_torch(A_current, lambda_reg, alpha, delta)
 
     # likelihood part uses stored Sk, yk (computed with A_kf)
-    phi = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em) + penalty
+    phi = Compute_PhiK_torch(0, Sk_kalman_em, yk_kalman_em) + penalty
 
-    dphiA = -np.reshape(np.sum(grad_A_phik, axis=1), (Nx, Nx)).T + grad_penalty
+    dphiA = -torch.reshape(torch.sum(grad_A_phik, axis=1), (Nx, Nx)).T + grad_penalty
+
+    print("Finished compute_loss_gradient_v2_torch.")
 
     return phi, dphiA
+
+
+def compute_loss_grad_alternative(
+    A_current,
+    A_kf,
+    kf_results,
+    z0, P0, H,
+    Nx, Nz, K,
+    lambda_reg=20, alpha=1, delta=1e-4
+):
+    
+
+    yk_kalman_em = kf_results["yk"]
+    Sk_kalman_em = kf_results["Sk"]
+    # recursion over stored time steps (use A_current when propagating gradient states)
+
+    # penalty computed at A_current
+    penalty, _ = grad_desc_penalty_torch(A_current, lambda_reg, alpha, delta)
+
+    # likelihood part uses stored Sk, yk (computed with A_kf)
+    phi = Compute_PhiK_torch(0, Sk_kalman_em, yk_kalman_em) + penalty
+    
+    return phi
 

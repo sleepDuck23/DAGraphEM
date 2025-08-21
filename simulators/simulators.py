@@ -1,5 +1,6 @@
 import numpy as np
 import networkx as nx
+import torch
 
 def CreateAdjacencyAR1(N,rho):
     A = np.zeros((N,N))
@@ -25,6 +26,24 @@ def GenerateSynthetic_order_p(K,A,H,p,x0,sigma_P, sigma_Q, sigma_R):
             deterministic_state += A @ x[:, k - pp - 1]
         x[:, k] = deterministic_state + sigma_Q * np.random.randn(Nx)
         y[:, k] = H @ x[:, k] + sigma_R * np.random.randn(Ny)
+
+    return y, x
+
+def GenerateSynthetic_order_p_torch(K,A,H,p,x0,sigma_P, sigma_Q, sigma_R):
+    Ny, Nx = H.shape
+
+    x = torch.zeros((Nx,K))
+    y = torch.zeros((Ny,K))
+
+    for pp in range(p):
+        x[:, pp] = (x0.flatten() + sigma_P * torch.randn(Nx)).flatten()
+
+    for k in range(p, K):
+        deterministic_state = torch.zeros(Nx)
+        for pp in range(p):
+            deterministic_state += A @ x[:, k - pp - 1]
+        x[:, k] = deterministic_state + sigma_Q * torch.randn(Nx)
+        y[:, k] = H @ x[:, k] + sigma_R * torch.randn(Ny)
 
     return y, x
 
