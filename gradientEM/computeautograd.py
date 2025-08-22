@@ -160,40 +160,40 @@ def compute_loss_gradient_torch(A, Q, x, z0, P0, H, R, Nx, Nz, K,lambda_reg=20,a
     return phi, dphi, dphiA
 
 def run_kalman_full_torch(A_kf, Q, x_data, z0, P0, H, R, Nx, Nz, K):
-   
-    # allocate
-    yk_kalman_em = np.zeros((Nx, K))
-    Sk_kalman_em = np.zeros((Nx, Nx, K))
-    z_mean_kalman_em = np.zeros((Nz, K))
-    Pk_minus = np.zeros((Nx, Nx, K))
-    Kk = np.zeros((Nx, Nz, K))
+    """
+    Fully differentiable Kalman filter over a time series.
+    Returns all relevant KF outputs.
+    """
+    device = A_kf.device
+    dtype = A_kf.dtype
 
-    # first step
-    z_mean_t0, P_t0, yk_t0, Sk_t0, Pk_minus_t0, Kk_t0 = Kalman_update_torch(
-        x_data[:, 0:1], z0, P0, A_kf, H, R, Q
-    )
+    # Allocate tensors
+    yk_kalman_em = torch.zeros((Nx, K), dtype=dtype, device=device)
+    Sk_kalman_em = torch.zeros((Nx, Nx, K), dtype=dtype, device=device)
+    z_mean_kalman_em = torch.zeros((Nz, K), dtype=dtype, device=device)
+    Pk_minus = torch.zeros((Nz, Nz, K), dtype=dtype, device=device)
+    Kk = torch.zeros((Nz, Nx, K), dtype=dtype, device=device)
 
-    yk_kalman_em = torch.zeros((Nx, K), dtype=A_kf.dtype, device=A_kf.device)
-    Sk_kalman_em = torch.zeros((Nx, Nx, K), dtype=A_kf.dtype, device=A_kf.device)
-    z_mean_kalman_em = torch.zeros((Nz, K), dtype=A_kf.dtype, device=A_kf.device)
-    Pk_minus = torch.zeros((Nx, Nx, K), dtype=A_kf.dtype, device=A_kf.device)
-    Kk = torch.zeros((Nx, Nz, K), dtype=A_kf.dtype, device=A_kf.device)
+    z_prev = z0
+    P_prev = P0
 
-
-    P_prev = P_t0
-
-    for k in range(1, K):
+    for k in range(K):
         x_k = x_data[:, k:k+1]
-        z_mean_tk, P_tk, yk_tk, Sk_tk, Pk_minus_tk, Kk_tk = Kalman_update_torch(
-            x_k, z_mean_kalman_em[:, k-1:k], P_prev, A_kf, H, R, Q
+
+        z_new, P_new, vk, Sk, P_pred, K_gain = Kalman_update_torch(
+            x_k, z_prev, P_prev, A_kf, H, R, Q
         )
 
-        z_mean_kalman_em[:, k] = z_mean_tk.squeeze()
-        yk_kalman_em[:, k] = yk_tk.squeeze()
-        Sk_kalman_em[:, :, k] = Sk_tk
-        Pk_minus[:, :, k] = Pk_minus_tk
-        Kk[:, :, k] = Kk_tk
-        P_prev = P_tk
+        # Save results (no in-place on leaves)
+        z_mean_kalman_em[:, k:k+1] = z_new
+        yk_kalman_em[:, k:k+1] = H @ z_prev  # predicted observation
+        Sk_kalman_em[:, :, k] = Sk
+        Pk_minus[:, :, k] = P_pred
+        Kk[:, :, k] = K_gain
+
+        # Prepare for next iteration
+        z_prev = z_new
+        P_prev = P_new
 
     return {
         "yk": yk_kalman_em,

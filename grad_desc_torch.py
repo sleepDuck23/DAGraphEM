@@ -9,16 +9,17 @@ import torch
 
 from scipy.linalg import expm
 from tools.matrix import calError
-from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
+from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1, Compute_PhiK_torch
 from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_update, Kalman_update_torch
 from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p_torch, CreateAdjacencyAR1, generate_random_DAG
-from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
+from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss, grad_desc_penalty_torch
 from gradientEM.computeautograd import compute_loss_gradient_torch, run_kalman_full_torch, compute_loss_gradient_v2_torch, compute_loss_grad_alternative
 from solvers.adam import adam, adam_alpha
 
+
 if __name__ == "__main__":
-    K = 500  # length of time series
+    K = 10  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
     D1, Graph = generate_random_DAG(4, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
@@ -43,8 +44,9 @@ if __name__ == "__main__":
     lambda_reg = 7
     alpha = 1
     factor_alpha = 1.1
+    delta = 1e-4
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
-    max_outer_iters = 10
+    max_outer_iters = 1
     num_lbfgs_steps = 10  # Number of steps for L-BFGS optimizer
     
     kf_change_log = {
@@ -93,7 +95,6 @@ if __name__ == "__main__":
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
-        #D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
         D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
         D1_em_save = torch.zeros((Nz, Nz, Nit_em))
         PhiK = torch.zeros(Nit_em)
@@ -108,36 +109,43 @@ if __name__ == "__main__":
         yk_kalman_em = torch.zeros((Nx, K))
         Sk_kalman_em = torch.zeros((Nx, Nx, K))
 
+        
         A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-        optimizer = torch.optim.LBFGS([A], lr=1.0, max_iter=10, history_size=10)
+        optimizer = torch.optim.LBFGS([A], lr=1e-2, max_iter=10, history_size=5)
 
-        for outer in range(max_outer_iters):
-            # E-step (no grad): run KF once with current A_kf
-            with torch.no_grad():
                 
-                kf_results = run_kalman_full_torch(A, Q, x, z0, P0, D2, R, Nx, Nz, K)
-                print(f"A: {A}")
+        for iter_outer in range(max_outer_iters):
+            # Step 1: Run Kalman filter with current A (detached inside KF if you want stability)
+            #with torch.no_grad():
+            #    kf_results = run_kalman_full_torch(A.detach(), Q, x, z0, P0, D2, R, Nx, Nz, K)
+            #    yk = kf_results["yk"]
+            #    Sk = kf_results["Sk"]
 
-            A_kf = A.detach()  # freeze KF params used to build the objective
+            
 
+        
+            # Step 2: define surrogate loss
             def closure():
                 optimizer.zero_grad()
-                # Uses cached KF outputs; no writes into big buffers inside the closure
-                loss = compute_loss_grad_alternative(
-                    A_current=A, A_kf=A_kf, kf_results=kf_results,
-                    z0=z0, P0=P0, H=D2, Nx=Nx, Nz=Nz, K=K,
-                    lambda_reg=lambda_reg, alpha=alpha, delta=1e-4
-                )
-                # If v2 returns analytic grad, set it explicitly:
+
+                kf_results = run_kalman_full_torch(A, Q, x, z0, P0, D2, R, Nx, Nz, K)
+                yk = kf_results["yk"]
+                Sk = kf_results["Sk"]
+                # Penalty term
+                penalty, _ = grad_desc_penalty_torch(A, lambda_reg, alpha, delta)
+                # Use KF outputs in phi
+                phi = Compute_PhiK_torch(0, Sk, yk)
+                loss = phi + penalty
                 loss.backward()
+                print("A:", A)
                 return loss
-
-            for step in range(num_lbfgs_steps):
-                optimizer.step(closure)
-
-        with torch.no_grad():
-            final_kf = run_kalman_full_torch(A, Q, x, z0, P0, D2, R, Nx, Nz, K)
-
+        
+            # Step 3: L-BFGS step
+            
+            optimizer.step(closure)
+        
+            print(f"Outer iter {iter_outer}, A norm = {A.norm().item()}")
+    
         
         D1_em = A.detach().cpu().numpy()
 
@@ -219,12 +227,4 @@ if __name__ == "__main__":
         plt.show()
 
 
-        plt.figure(figsize=(8,5))
-        for var, values in kf_change_log.items():
-            plt.plot(values, label=var)
-        plt.yscale("log")
-        plt.xlabel("Outer Iteration")
-        plt.ylabel("Change Norm (log scale)")
-        plt.title("Change in Kalman filter variables per iteration")
-        plt.legend()
-        plt.show()
+    

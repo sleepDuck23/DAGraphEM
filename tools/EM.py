@@ -48,16 +48,31 @@ def Kalman_update(y_k,xk_mean_past,Pk_past,A,H,R,Q):
     return xk_mean_new, Pk_new, vk, Sk, Pk_minus, Kk
 
 def Kalman_update_torch(y_k, xk_mean_past, Pk_past, A, H, R, Q):
+    """
+    Single Kalman filter update (prediction + correction) in PyTorch.
+    All inputs are torch tensors; fully differentiable.
+    """
+    dtype = A.dtype
+    device = A.device
+    Nx = y_k.shape[0]
+
+    # Prediction
     xk_minus = A @ xk_mean_past
     Pk_minus = A @ Pk_past @ A.T + Q
 
+    # Innovation
     vk = y_k - H @ xk_minus
     Sk = H @ Pk_minus @ H.T + R
-    Kk = Pk_minus @ H.T @ torch.linalg.inv(Sk)
+
+    # Kalman gain (more stable than using inv directly)
+    Kk = torch.linalg.solve(Sk, H @ Pk_minus).T  # equivalent to Pk_minus H^T S^-1
+
+    # Update
     xk_mean_new = xk_minus + Kk @ vk
     Pk_new = Pk_minus - Kk @ Sk @ Kk.T
-   
+
     return xk_mean_new, Pk_new, vk, Sk, Pk_minus, Kk
+
 
 def EM_parameters(x, z_mean_smooth, P_smooth, G_smooth, z_mean_smooth0, P_smooth0, G_smooth0):
 
