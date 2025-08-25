@@ -13,7 +13,7 @@ def logdet_dag_torch(A):
     #jitter = 1e-6 * I
     #mat = mat + jitter
     # logdet can be computed with torch.slogdet for stability
-    sign, logdet = torch.slogdet(mat)
+    sign, logdet = torch.linalg.slogdet(mat)
     if (sign <= 0).any():
         # handle non-positive definite case
         return torch.tensor(float('-inf'))
@@ -143,13 +143,13 @@ def grad_desc_penalty_torch(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     f2 = lambda_reg * torch.sum(torch.sqrt(A**2 + delta**2))
 
     # L1 norm gradient
-    grad_f2 = lambda_reg * A/(torch.sqrt(A*A + delta**2))
+    grad_f2 = lambda_reg * A/(torch.sqrt(A**2 + delta**2))
 
     # logdet penalty
     h = -alpha * logdet_dag_torch(A)
 
     # logdet gradient
-    grad_h = -alpha * 2 * A * torch.linalg.inv(torch.eye(A.shape[0])- A*A).T
+    grad_h = alpha * 2 * A * torch.linalg.inv(torch.eye(A.shape[0])- A*A).T
 
     return f2 + h, grad_f2 + grad_h
 

@@ -19,7 +19,7 @@ from solvers.adam import adam, adam_alpha
 
 
 if __name__ == "__main__":
-    K = 10  # length of time series
+    K = 500  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
     D1, Graph = generate_random_DAG(4, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
@@ -41,13 +41,15 @@ if __name__ == "__main__":
 
     reg1 = 1
     gamma1 = 20
-    lambda_reg = 7
+    lambda_reg = 5
     alpha = 1
-    factor_alpha = 1.1
+    factor_alpha = 5
+    upper_bound_alpha = 1e6
     delta = 1e-4
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
-    max_outer_iters = 1
+    max_outer_iters = 20
     num_lbfgs_steps = 10  # Number of steps for L-BFGS optimizer
+    prec_dag = 1e-9
     
     kf_change_log = {
         "yk": [],
@@ -67,14 +69,14 @@ if __name__ == "__main__":
     reg['Mask'] = Mask_true  # only used to try the OracleEM option ie reg.reg1=3
 
     Nreal = 1  # Number of independent runs
-    tEnd = torch.zeros(Nreal)
-    RMSE = torch.zeros(Nreal)
-    accuracy = torch.zeros(Nreal)
-    precision = torch.zeros(Nreal)
-    recall = torch.zeros(Nreal)
-    specificity = torch.zeros(Nreal)
-    F1score = torch.zeros(Nreal)
-    saveX = torch.zeros((Nx, K, Nreal))
+    tEnd = np.zeros(Nreal)
+    RMSE = np.zeros(Nreal)
+    accuracy = np.zeros(Nreal)
+    precision = np.zeros(Nreal)
+    recall = np.zeros(Nreal)
+    specificity = np.zeros(Nreal)
+    F1score = np.zeros(Nreal)
+    saveX = np.zeros((Nx, K, Nreal))
 
 
     for real in range(Nreal):
@@ -88,20 +90,20 @@ if __name__ == "__main__":
         Err_D1 = []
         charac_dag = []
         stop_crit = []
-        Nit_em = 1  # number of iterations maximum f
-        prec = 1e-4  # precision for EM loop
-        precDAG = 1e-3
+        prec = 1e-3  # precision for EM loop
+        precDAG = 1e-9
         w_threshold = 1e-4
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
-        D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
-        D1_em_save = torch.zeros((Nz, Nz, Nit_em))
-        PhiK = torch.zeros(Nit_em)
-        MLsave = torch.zeros(Nit_em)
-        Regsave = torch.zeros(Nit_em)
-        Maj_before = torch.zeros(Nit_em)
-        Maj_after = torch.zeros(Nit_em)
+        #D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
+        D1_em = np.zeros((Nz, Nz))
+        D1_em_save = np.zeros((Nz, Nz, max_outer_iters))
+        PhiK = torch.zeros(max_outer_iters)
+        MLsave = torch.zeros(max_outer_iters)
+        Regsave = torch.zeros(max_outer_iters)
+        Maj_before = torch.zeros(max_outer_iters)
+        Maj_after = torch.zeros(max_outer_iters)
             
         # 1/ Kalman filter filter
         z_mean_kalman_em = torch.zeros((Nz, K))
@@ -111,50 +113,53 @@ if __name__ == "__main__":
 
         
         A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-        optimizer = torch.optim.LBFGS([A], lr=1e-2, max_iter=10, history_size=5)
+        optimizer = torch.optim.LBFGS([A], lr=1e-2, max_iter=5, history_size=5)
 
                 
-        for iter_outer in range(max_outer_iters):
-            # Step 1: Run Kalman filter with current A (detached inside KF if you want stability)
-            #with torch.no_grad():
-            #    kf_results = run_kalman_full_torch(A.detach(), Q, x, z0, P0, D2, R, Nx, Nz, K)
-            #    yk = kf_results["yk"]
-            #    Sk = kf_results["Sk"]
-
+        for iter_outer in range(max_outer_iters):        
             
-
-        
-            # Step 2: define surrogate loss
             def closure():
                 optimizer.zero_grad()
 
-                kf_results = run_kalman_full_torch(A, Q, x, z0, P0, D2, R, Nx, Nz, K)
-                yk = kf_results["yk"]
-                Sk = kf_results["Sk"]
-                # Penalty term
-                penalty, _ = grad_desc_penalty_torch(A, lambda_reg, alpha, delta)
-                # Use KF outputs in phi
-                phi = Compute_PhiK_torch(0, Sk, yk)
-                loss = phi + penalty
-                loss.backward()
-                print("A:", A)
-                return loss
+                # Compute exact loss and gradients
+                phi, dphi, dphiA = compute_loss_gradient_torch(
+                    A, Q, x, z0, P0, D2, R, Nx, Nz, K,
+                    lambda_reg=lambda_reg, alpha=alpha, delta=delta
+                )
+
+                # Assign gradient manually
+                A.grad = dphiA.clone().contiguous()
+
+                print("Loss:", phi.item())
+                return phi
         
-            # Step 3: L-BFGS step
             
             optimizer.step(closure)
-        
-            print(f"Outer iter {iter_outer}, A norm = {A.norm().item()}")
-    
-        
-        D1_em = A.detach().cpu().numpy()
 
+            D1_em = A.detach().cpu().numpy()
+            D1_em_save[:, :, iter_outer] = D1_em
+            charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+            Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
+
+            print(f"End of outer iteration {iter_outer + 1}, current D1 estimate:\n{A.detach().cpu().numpy()}")
+            print(f"Current alpha: {alpha}")
+            print("--------------------------------------------------")
+
+            if alpha <= upper_bound_alpha and iter_outer >= max_outer_iters/2:
+                alpha = alpha * factor_alpha
+            
+            if iter_outer > 0:
+                if np.linalg.norm(D1_em_save[:, :, iter_outer - 1] - D1_em_save[:, :, iter_outer], 'fro') / \
+                   np.linalg.norm(D1_em_save[:, :, iter_outer - 1], 'fro') < prec and charac_dag[iter_outer] < prec_dag:
+                    print(f"EM converged after iteration {iter_outer + 1}")
+                    break
 
         tEnd[real] = time.perf_counter() - tStart
 
         D1_em[D1_em < w_threshold] = 0 #Eliminate edges that are close to zero0
 
         D1_em_final = D1_em
+
         print(f"Final D1 estimated:\n{D1_em_final}")
         print(f"Final D1 true:\n{D1}")
 
@@ -199,9 +204,9 @@ if __name__ == "__main__":
         print(f"Final error on D1 = {RMSE[real]:.4f}")
         print(f"accuracy = {accuracy[real]:.4f}; precision = {precision[real]:.4f}; recall = {recall[real]:.4f}; specificity = {specificity[real]:.4f}")
 
-    print(f"Total time = {torch.mean(tEnd):.4f}")
+    print(f"Total time = {np.mean(tEnd):.4f}")
 
-    print(f"average RMSE = {torch.nanmean(RMSE):.4f}")
+    print(f"average RMSE = {np.nanmean(RMSE):.4f}")
     print(f"average accuracy = {np.nanmean(accuracy):.4f}")
     print(f"average precision = {np.nanmean(precision):.4f}")
     print(f"average recall = {np.nanmean(recall):.4f}")
@@ -209,8 +214,6 @@ if __name__ == "__main__":
     print(f"average F1 score = {np.nanmean(F1score):.4f}")
     print(f"Is it a DAG = {nx.is_directed_acyclic_graph(TestDAG)}")
 
-    print(f"Final D1 estimated:\n{D1_em_final}")
-    print(f"Final D1 true:\n{D1}")
 
     if flag_plot == 1:
         plt.figure()
@@ -224,6 +227,22 @@ if __name__ == "__main__":
         plt.colorbar()
         plt.title('Estimated D1')
         plt.axis('off')
+        plt.show()
+
+        plt.figure()
+        plt.semilogy(charac_dag)
+        plt.title('DAG characterization of A')
+        plt.xlabel('DAGrad iterations')
+        plt.ylabel('Characterization')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure()
+        plt.semilogy(Err_D1)
+        plt.title('Error on A')
+        plt.xlabel('DAGrad iterations')
+        plt.ylabel('Frobenius Norm Error')
+        plt.grid(True)
         plt.show()
 
 
