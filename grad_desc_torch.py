@@ -131,7 +131,6 @@ if __name__ == "__main__":
 
                 print("Loss:", phi.item())
                 return phi
-        
             
             optimizer.step(closure)
 
@@ -147,10 +146,9 @@ if __name__ == "__main__":
             stop_crit.append(np.linalg.norm(D1_em_save[:, :, iter_outer] - D1_em_save[:, :, iter_outer - 1], 'fro') / \
                              np.linalg.norm(D1_em_save[:, :, iter_outer - 1], 'fro'))
             
-            if alpha <= upper_bound_alpha: # and stop_crit[iter_outer] <= 1e-1:
+            if alpha <= upper_bound_alpha and stop_crit[iter_outer] <= 1e-1:
                 alpha = alpha * factor_alpha
 
-            
             if iter_outer > 0:
                 if stop_crit[iter_outer] < prec and charac_dag[iter_outer] < prec_dag:
                     print(f"EM converged after iteration {iter_outer + 1}")
