@@ -153,6 +153,8 @@ def grad_desc_penalty_torch(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
 
     return f2 + h, grad_f2 + grad_h
 
+
+
 def grad_desc_penalty(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     # L1 norm
     f2 = lambda_reg * np.sum(np.sqrt(A**2 + delta**2))

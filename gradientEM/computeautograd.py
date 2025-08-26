@@ -172,6 +172,7 @@ def compute_loss_gradient_torch(
     # Regularization penalty and gradient
     penalty, grad_penalty = grad_desc_penalty_torch(A, lambda_reg, alpha, delta)
 
+
     # Loss: negative log-likelihood + penalty
     phi = Compute_PhiK_torch(0, Sk_kalman_em, yk_kalman_em) + penalty
 

@@ -41,15 +41,16 @@ if __name__ == "__main__":
 
     reg1 = 1
     gamma1 = 20
-    lambda_reg = 5
+    lambda_reg = 10
     alpha = 1
-    factor_alpha = 5
-    upper_bound_alpha = 1e6
+    factor_alpha = 10
+    upper_bound_alpha = 1e15
     delta = 1e-4
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
-    max_outer_iters = 20
+    max_outer_iters = 10
     num_lbfgs_steps = 10  # Number of steps for L-BFGS optimizer
-    prec_dag = 1e-9
+    prec_dag = 1e-15
+    prec = 1e-2
     
     kf_change_log = {
         "yk": [],
@@ -90,12 +91,10 @@ if __name__ == "__main__":
         Err_D1 = []
         charac_dag = []
         stop_crit = []
-        prec = 1e-3  # precision for EM loop
-        precDAG = 1e-9
         w_threshold = 1e-4
 
         tStart = time.perf_counter() 
-        # initialization of GRAPHEM
+        
         #D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
         D1_em = np.zeros((Nz, Nz))
         D1_em_save = np.zeros((Nz, Nz, max_outer_iters))
@@ -113,7 +112,7 @@ if __name__ == "__main__":
 
         
         A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-        optimizer = torch.optim.LBFGS([A], lr=1e-2, max_iter=5, history_size=5)
+        optimizer = torch.optim.LBFGS([A], lr=1e-2, max_iter=5, history_size=50)
 
                 
         for iter_outer in range(max_outer_iters):        
@@ -122,7 +121,7 @@ if __name__ == "__main__":
                 optimizer.zero_grad()
 
                 # Compute exact loss and gradients
-                phi, dphi, dphiA = compute_loss_gradient_torch(
+                phi, _, dphiA = compute_loss_gradient_torch(
                     A, Q, x, z0, P0, D2, R, Nx, Nz, K,
                     lambda_reg=lambda_reg, alpha=alpha, delta=delta
                 )
@@ -145,13 +144,18 @@ if __name__ == "__main__":
             print(f"Current alpha: {alpha}")
             print("--------------------------------------------------")
 
-            if alpha <= upper_bound_alpha and iter_outer >= max_outer_iters/2:
+            stop_crit.append(np.linalg.norm(D1_em_save[:, :, iter_outer] - D1_em_save[:, :, iter_outer - 1], 'fro') / \
+                             np.linalg.norm(D1_em_save[:, :, iter_outer - 1], 'fro'))
+            
+            if alpha <= upper_bound_alpha: # and stop_crit[iter_outer] <= 1e-1:
                 alpha = alpha * factor_alpha
+
             
             if iter_outer > 0:
-                if np.linalg.norm(D1_em_save[:, :, iter_outer - 1] - D1_em_save[:, :, iter_outer], 'fro') / \
-                   np.linalg.norm(D1_em_save[:, :, iter_outer - 1], 'fro') < prec and charac_dag[iter_outer] < prec_dag:
+                if stop_crit[iter_outer] < prec and charac_dag[iter_outer] < prec_dag:
                     print(f"EM converged after iteration {iter_outer + 1}")
+                    print(f"Final alpha: {alpha}")
+                    print(f"final charac dag = {charac_dag[iter_outer]}")
                     break
 
         tEnd[real] = time.perf_counter() - tStart
@@ -242,6 +246,14 @@ if __name__ == "__main__":
         plt.title('Error on A')
         plt.xlabel('DAGrad iterations')
         plt.ylabel('Frobenius Norm Error')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure()
+        plt.semilogy(stop_crit)
+        plt.title('Stopping criterion')
+        plt.xlabel('DAGrad iterations')
+        plt.ylabel('Frobenius Norm change')
         plt.grid(True)
         plt.show()
 
