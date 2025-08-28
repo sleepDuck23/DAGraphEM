@@ -22,7 +22,7 @@ if __name__ == "__main__":
     K = 500  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(4, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(15, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = torch.eye(Nz)  # for simplicity and identifiability purposes
@@ -41,15 +41,15 @@ if __name__ == "__main__":
 
     reg1 = 1
     gamma1 = 20
-    lambda_reg = 10
+    lambda_reg = 50
     alpha = 1
-    factor_alpha = 10
+    factor_alpha = 20
     upper_bound_alpha = 1e15
     delta = 1e-4
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
     max_outer_iters = 10
     num_lbfgs_steps = 10  # Number of steps for L-BFGS optimizer
-    prec_dag = 1e-15
+    prec_dag = 1e-6
     prec = 1e-2
     
     kf_change_log = {
@@ -83,6 +83,9 @@ if __name__ == "__main__":
     for real in range(Nreal):
         print(f"---- REALIZATION {real + 1} ----")
 
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {device}")
+
         # Synthetic data generation
         y, x = GenerateSynthetic_order_p_torch(K, D1, D2, p, z0, sigma_P, sigma_Q, sigma_R)
        
@@ -112,7 +115,10 @@ if __name__ == "__main__":
 
         
         A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-        optimizer = torch.optim.LBFGS([A], lr=1e-2, max_iter=5, history_size=50)
+        optimizer = torch.optim.LBFGS([A], lr=1e-1, max_iter=10, history_size=5)
+        #optimizer = torch.optim.Adam([A], lr=1e-4)
+
+        #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.9)
 
                 
         for iter_outer in range(max_outer_iters):        
@@ -134,6 +140,9 @@ if __name__ == "__main__":
             
             optimizer.step(closure)
 
+            #with torch.no_grad():
+            #    A.data[torch.abs(A.data) < w_threshold] = 0.0
+
             D1_em = A.detach().cpu().numpy()
             D1_em_save[:, :, iter_outer] = D1_em
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
@@ -146,7 +155,7 @@ if __name__ == "__main__":
             stop_crit.append(np.linalg.norm(D1_em_save[:, :, iter_outer] - D1_em_save[:, :, iter_outer - 1], 'fro') / \
                              np.linalg.norm(D1_em_save[:, :, iter_outer - 1], 'fro'))
             
-            if alpha <= upper_bound_alpha and stop_crit[iter_outer] <= 1e-1:
+            if alpha <= upper_bound_alpha:
                 alpha = alpha * factor_alpha
 
             if iter_outer > 0:
@@ -162,7 +171,8 @@ if __name__ == "__main__":
 
         D1_em_final = D1_em
 
-        print(f"Final D1 estimated:\n{D1_em_final}")
+        formatted_D1 = np.array2string(D1_em_final, precision=4)
+        print(f"Final D1 estimated:\n{formatted_D1}")
         print(f"Final D1 true:\n{D1}")
 
         TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
@@ -255,5 +265,7 @@ if __name__ == "__main__":
         plt.grid(True)
         plt.show()
 
+
+print(f"dag charac = {charac_dag}")
 
     
