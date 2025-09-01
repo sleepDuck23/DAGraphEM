@@ -67,6 +67,7 @@ def compute_loss_zero(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5):
     return f1 + f2 
 
 def compute_new_loss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-4):
+    print("Computing new loss")
     # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))
     CA_T = C @ A.T
     AC_T = A @ C.T

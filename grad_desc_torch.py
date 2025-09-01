@@ -22,7 +22,7 @@ if __name__ == "__main__":
     K = 500  # length of time series
     flag_plot = 1
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(15, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = torch.eye(Nz)  # for simplicity and identifiability purposes
@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     reg1 = 1
     gamma1 = 20
-    lambda_reg = 50
+    lambda_reg = 20
     alpha = 1
     factor_alpha = 20
     upper_bound_alpha = 1e15
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         Err_D1 = []
         charac_dag = []
         stop_crit = []
-        w_threshold = 1e-4
+        w_threshold = 1e-2
 
         tStart = time.perf_counter() 
         
@@ -115,7 +115,7 @@ if __name__ == "__main__":
 
         
         A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-        optimizer = torch.optim.LBFGS([A], lr=1e-1, max_iter=10, history_size=5)
+        optimizer = torch.optim.LBFGS([A], lr=1e-1, max_iter=10, history_size=5, line_search_fn='strong_wolfe')
         #optimizer = torch.optim.Adam([A], lr=1e-4)
 
         #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.9)
@@ -266,6 +266,5 @@ if __name__ == "__main__":
         plt.show()
 
 
-print(f"dag charac = {charac_dag}")
 
     

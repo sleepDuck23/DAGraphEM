@@ -105,14 +105,14 @@ if __name__ == "__main__":
             Sk_kalman_em = np.zeros((Nx, Nx, K))
 
             x_k_initial = x[:, 0].reshape(-1, 1)  # Reshape to a column vector
-            z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0] = \
+            z_mean_kalman_em_temp, P_kalman_em[:, :, 0], yk_kalman_em_temp, Sk_kalman_em[:, :, 0],_,_ = \
                 Kalman_update(x_k_initial, z0, P0, D1_em, D2, R, Q)
             z_mean_kalman_em[:, 0] = z_mean_kalman_em_temp.flatten()
             yk_kalman_em[:, 0] = yk_kalman_em_temp.flatten()
 
             for k in range(1, K):
                 x_k = x[:, k].reshape(-1, 1)      # Reshape each observation
-                z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k] = \
+                z_mean_kalman_em_temp, P_kalman_em[:, :, k], yk_kalman_em_temp, Sk_kalman_em[:, :, k],_,_ = \
                     Kalman_update(x_k, z_mean_kalman_em[:, k - 1].reshape(-1, 1), P_kalman_em[:, :, k - 1], D1_em, D2, R, Q)
                 z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
                 yk_kalman_em[:, k] = yk_kalman_em_temp.flatten()
@@ -164,6 +164,7 @@ if __name__ == "__main__":
             
 
             for step in range(num_lbfgs_steps):
+                print(f"step: {step}")
                 optimizer.step(closure)
 
             
