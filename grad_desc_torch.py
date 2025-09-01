@@ -41,16 +41,16 @@ if __name__ == "__main__":
 
     reg1 = 1
     gamma1 = 20
-    lambda_reg = 20
-    alpha = 1
+    lambda_reg = 30
+    alpha = 0
     factor_alpha = 20
     upper_bound_alpha = 1e15
     delta = 1e-4
     stepsize = 0.1 # This stepsize is not directly used by L-BFGS, but can be for other parts.
     max_outer_iters = 10
     num_lbfgs_steps = 10  # Number of steps for L-BFGS optimizer
-    prec_dag = 1e-6
-    prec = 1e-2
+    prec_dag = 1e-9
+    prec = 1e-3
     
     kf_change_log = {
         "yk": [],
@@ -94,7 +94,8 @@ if __name__ == "__main__":
         Err_D1 = []
         charac_dag = []
         stop_crit = []
-        w_threshold = 1e-2
+        alpha_values = []
+        w_threshold = 1e-4
 
         tStart = time.perf_counter() 
         
@@ -115,7 +116,7 @@ if __name__ == "__main__":
 
         
         A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-        optimizer = torch.optim.LBFGS([A], lr=1e-1, max_iter=10, history_size=5, line_search_fn='strong_wolfe')
+        optimizer = torch.optim.LBFGS([A], lr=1, max_iter=10, history_size=5, line_search_fn='strong_wolfe')
         #optimizer = torch.optim.Adam([A], lr=1e-4)
 
         #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.9)
@@ -147,17 +148,26 @@ if __name__ == "__main__":
             D1_em_save[:, :, iter_outer] = D1_em
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
+            alpha_values.append(alpha)
 
-            print(f"End of outer iteration {iter_outer + 1}, current D1 estimate:\n{A.detach().cpu().numpy()}")
+            A_binary = (np.abs(A.detach().cpu().numpy()) >= w_threshold).astype(int)
+            print(f"End of outer iteration {iter_outer + 1}, current D1 estimate:\n{A_binary}")
+            print(f"Is it a DAG = {nx.is_directed_acyclic_graph(nx.from_numpy_array(A.detach().cpu().numpy(), create_using=nx.DiGraph))}")
+            print(f"Current characterization of DAG-ness: {charac_dag[-1]}")
+            print(f"current dag binary: {np.trace(expm(A_binary*A_binary))-A_binary[0].shape}")
             print(f"Current alpha: {alpha}")
             print("--------------------------------------------------")
 
             stop_crit.append(np.linalg.norm(D1_em_save[:, :, iter_outer] - D1_em_save[:, :, iter_outer - 1], 'fro') / \
                              np.linalg.norm(D1_em_save[:, :, iter_outer - 1], 'fro'))
             
+            
             if alpha <= upper_bound_alpha:
+                if iter_outer > 0:
+                    alpha = alpha + 1
                 alpha = alpha * factor_alpha
 
+            
             if iter_outer > 0:
                 if stop_crit[iter_outer] < prec and charac_dag[iter_outer] < prec_dag:
                     print(f"EM converged after iteration {iter_outer + 1}")
@@ -181,6 +191,11 @@ if __name__ == "__main__":
         D1_binary = np.abs(D1.detach().cpu().numpy()) >= threshold
         D1_em_binary = np.abs(D1_em_final) >= threshold
         TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
+
+        compare_graph = (D1_binary*4) +  D1_em_binary
+        print(f"comparing: \n {compare_graph}")
+        
+        print(f"alpha values: {alpha_values}")
 
         plt.figure(30, figsize=(10, 5))
         plt.subplot(1, 2, 1)
@@ -246,6 +261,14 @@ if __name__ == "__main__":
         plt.title('DAG characterization of A')
         plt.xlabel('DAGrad iterations')
         plt.ylabel('Characterization')
+        plt.grid(True)
+        plt.show()
+
+        plt.figure()
+        plt.semilogx(alpha_values, charac_dag, marker='o')
+        plt.title('DAG characterization vs Alpha')
+        plt.xlabel('Alpha values')
+        plt.ylabel('DAG characterization')
         plt.grid(True)
         plt.show()
 

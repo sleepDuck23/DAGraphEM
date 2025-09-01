@@ -139,22 +139,24 @@ def pipa_f1_h_grad(A,K,Q,Sigma,C,Phi,alpha=0.5):
 
     return f1_g + h_grad
 
-def grad_desc_penalty_torch(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
+def grad_desc_penalty_torch(A,lambda_reg=0.1,alpha=1,delta=1e-4):
     # L1 norm
-    f2 = lambda_reg * torch.sum(torch.sqrt(A**2 + delta**2)) 
+    f2 = lambda_reg * torch.sum(torch.abs(A))
+    #f2 = lambda_reg * torch.sum(torch.sqrt(A**2 + delta**2)) 
     #f2 = lambda_reg * torch.sum((A**2)) #l2 
 
     # L1 norm gradient
-    grad_f2 = lambda_reg * A/(torch.sqrt(A**2 + delta**2))
+    grad_f2 = lambda_reg * torch.sign(A)
+    #grad_f2 = lambda_reg * A/(torch.sqrt(A**2 + delta**2))
     #grad_f2 = lambda_reg * A * 2 #l2
 
     # logdet penalty
-    #h = -alpha * logdet_dag_torch(A)
-    h = alpha * (torch.trace(torch.linalg.matrix_exp(A*A)) - A.shape[0])
+    h = -alpha * logdet_dag_torch(A)
+    #h = alpha * (torch.trace(torch.linalg.matrix_exp(A*A)) - A.shape[0])
 
     # logdet gradient
-    #grad_h = alpha * 2 * A * torch.linalg.inv((torch.eye(A.shape[0])- A*A).T)
-    grad_h = alpha * 2 * A * torch.linalg.matrix_exp(A*A).T
+    grad_h = alpha * 2 * A * torch.linalg.inv((torch.eye(A.shape[0])- A*A).T)
+    #grad_h = alpha * 2 * A * torch.linalg.matrix_exp(A*A).T
 
     return f2 + h, grad_f2 + grad_h
 
