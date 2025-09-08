@@ -17,7 +17,7 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
 from solvers.adam import adam
 
 if __name__ == "__main__":
-    K = 500  # length of time series
+    K = 2000  # length of time series
     flag_plot = 1
 
     ## Load ground truth matrix D1
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(20, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(10, graph_type='ER', edge_prob=0.2, seed=45,weight_range=(0.1, 0.99)) # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -53,13 +53,13 @@ if __name__ == "__main__":
     #reg1 = 113
     gamma1 = 0
     num_adam_steps = 1000
-    lambda_reg = 20
+    lambda_reg = 30
     alpha = 1
     factor_alpha = 10 # factor to increase alpha
     stepsize = 1e-4
-    upper_alpha = 1e15  # upper bound for alpha
+    upper_alpha = 1e18  # upper bound for alpha
 
-    w_threshold = 1e-2  # threshold to eliminate small weights
+    w_threshold = 1e-4  # threshold to eliminate small weights
     
 
     reg = {}
@@ -104,8 +104,8 @@ if __name__ == "__main__":
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
-        #D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
-        D1_em = create_fixed_upper_triangular_dag(Nz, weight=0.5)  # Initialize D1_em to a fixed upper triangular DAG
+        D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
+        #D1_em = create_fixed_upper_triangular_dag(Nz, weight=0.5)  # Initialize D1_em to a fixed upper triangular DAG
         #D1_em = np.zeros((Nz, Nz))  # Initialize D1_em to a zero matrix
         D1_em_save = np.zeros((Nz, Nz, Nit_em))
         PhiK = np.zeros(Nit_em)
@@ -238,7 +238,7 @@ if __name__ == "__main__":
         nx.draw(G_est, pos, width=linewidths_est, with_labels=False, node_size=30, arrowsize=10)
         plt.title('Estimated D1 Network')
         plt.tight_layout()
-        plt.savefig('D1_networks.png', dpi=300)
+        plt.savefig('D1_networks_indv.png', dpi=300)
         plt.show()
 
         precision[real] = TP / (TP + FP + 1e-8)
@@ -278,30 +278,34 @@ if __name__ == "__main__":
         plt.colorbar()
         plt.title('Estimated D1')
         plt.axis('off')
+        plt.savefig('map_indv.png', dpi=300)
         plt.show()
 
         plt.figure(3)
         plt.semilogy(Err_D1)
         plt.title('Error on A')
-        plt.xlabel('GRAPHEM iterations')
+        plt.xlabel('Iterations')
         plt.ylabel('Frobenius Norm Error')
         plt.grid(True)
+        plt.savefig('error_indv.png', dpi=300)
         plt.show()
 
         plt.figure(4)
         plt.plot(PhiK[:len(Err_D1)])
         plt.title('Loss function')
-        plt.xlabel('GRAPHEM iterations')
+        plt.xlabel('Iterations')
         plt.ylabel('Loss Value')
         plt.grid(True)
+        plt.savefig('loss_indv.png', dpi=300)
         plt.show()
 
         plt.figure(5)
         plt.semilogy(charac_dag)
         plt.title('DAG characterization of A')
-        plt.xlabel('GRAPHEM iterations')
+        plt.xlabel('Iterations')
         plt.ylabel('Characterization')
         plt.grid(True)
+        plt.savefig('Dag_charac_indv.png', dpi=300)
         plt.show()
 
         plt.figure(6)
@@ -310,6 +314,7 @@ if __name__ == "__main__":
         plt.xlabel('GRAPHEM iterations')
         plt.ylabel('Characterization')
         plt.grid(True)
+        plt.savefig('Dag_loss_indv.png', dpi=300)
         plt.show()
 
         plt.figure(7)

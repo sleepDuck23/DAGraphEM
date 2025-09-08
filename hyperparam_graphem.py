@@ -47,7 +47,7 @@ if __name__ == "__main__":
             for seeds in random_seed:
                 print(f"---- Seed: {seeds} ----")
 
-                K = 2000
+                K = 100
                 flag_plot = 0
 
                 D1, Graph = generate_random_DAG(nodes_size[nodex], graph_type='ER', edge_prob=0.2, seed=seeds)
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
                 Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q)).to(device)
 
-                reg = {'reg1': 1, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
+                reg = {'reg1': 113, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
 
                 saveX = np.zeros((Nx, K, 1))
 
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "graphem_reg113_k2000.csv"
+    csv_path = "graphem_reg113_k100.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
