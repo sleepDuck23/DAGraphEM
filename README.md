@@ -15,14 +15,14 @@ This toolbox consists of 5 subfolders:
 2) gradientEM: gradients and important fucntions for the models to compute the solution of the loss fucntions
 3) solvers: ADAM and L-BFGS solvers in NumPy
 4) simulators: contains functions to generate DAG adjacency matrices, time series and initialization
-5) tools: Fucntions for the correct work of all models
-    5.1) EM: contains functions for building EM algorithm updates
-    5.2) loss: contains functions for evaluating the likelihood and prior loss
-    5.3) matrix: contains functions for block sparsity models and for score computations
-    5.4) prox: contains functions for evaluating useful proximity operators
-    5.5) dag: DAG characterization and sparsity contraints for the loss functions
-    5.6) dagma: DAGMA implementation
-    5.7) l_bfgs: L-BFGS implementation
+5) tools: Fucntions for the correct work of all models \n
+    5.1) EM: contains functions for building EM algorithm updates \n
+    5.2) loss: contains functions for evaluating the likelihood and prior loss \n
+    5.3) matrix: contains functions for block sparsity models and for score computations \n
+    5.4) prox: contains functions for evaluating useful proximity operators \n
+    5.5) dag: DAG characterization and sparsity contraints for the loss functions \n
+    5.6) dagma: DAGMA implementation \n
+    5.7) l_bfgs: L-BFGS implementation \n
 ------------------------------------------------------------------------------------
 SPECIFICATIONS for using the implemented models:
 * main.py : GraphEM model with DAG generation
