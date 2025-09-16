@@ -142,7 +142,7 @@ if __name__ == "__main__":
             optimizer.step(closure)
 
             #with torch.no_grad():
-            #    A.data[torch.abs(A.data) < w_threshold] = 0.0
+            #    A.data[torch.abs(A.data) < w_threshold] = 0.0 
 
             D1_em = A.detach().cpu().numpy()
             D1_em_save[:, :, iter_outer] = D1_em
