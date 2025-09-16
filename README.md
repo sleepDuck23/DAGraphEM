@@ -1,28 +1,29 @@
-# GraphEM
-GraphEM algorithm converted into python language
-
+# DAGraphEM
+DAGraphEM algorithm 
+------------------------------------------------------------------------------------
+Code for comparing DAGraphEM with other methods that provide the inference of graphs from LG-SSM time-series.
 ------------------------------------------------------------------------------------
 DESCRIPTION:
 This toolbox allows to estimate the transition matrix in linear-Gaussian state space model. 
 We implement a method called GraphEM based on the expectation-maximization (EM) 
 methodology for inferring the transition matrix jointly with the smoothing/filtering of the  
-observed data. We implement a proximal-based convex optimization solver  for solving the 
+observed data. We implement a gradient descent optimization solver  for solving the 
 M-step. This approach enables an efficient and versatile processing of various sophisticated 
 priors on the graph structure, such as parsimony constraints, while benefiting from  
-convergence guarantees.  
+convergence guarantees towards the DAG space.  
 This toolbox consists of 5 subfolders:
 1) dataset  : contains the synthetic dataset from [Elvira & Chouzenoux, 2022]. 
 2) gradientEM: gradients and important fucntions for the models to compute the solution of the loss fucntions
 3) solvers: ADAM and L-BFGS solvers in NumPy
 4) simulators: contains functions to generate DAG adjacency matrices, time series and initialization
-5) tools: Fucntions for the correct work of all models \n
-    5.1) EM: contains functions for building EM algorithm updates \n
-    5.2) loss: contains functions for evaluating the likelihood and prior loss \n
-    5.3) matrix: contains functions for block sparsity models and for score computations \n
-    5.4) prox: contains functions for evaluating useful proximity operators \n
-    5.5) dag: DAG characterization and sparsity contraints for the loss functions \n
-    5.6) dagma: DAGMA implementation \n
-    5.7) l_bfgs: L-BFGS implementation \n
+5) tools: Fucntions for the correct work of all models
+    * 5.1) EM: contains functions for building EM algorithm updates
+    * 5.2) loss: contains functions for evaluating the likelihood and prior loss
+    * 5.3) matrix: contains functions for block sparsity models and for score computations
+    * 5.4) prox: contains functions for evaluating useful proximity operators
+    * 5.5) dag: DAG characterization and sparsity contraints for the loss functions
+    * 5.6) dagma: DAGMA implementation
+    * 5.7) l_bfgs: L-BFGS implementation
 ------------------------------------------------------------------------------------
 SPECIFICATIONS for using the implemented models:
 * main.py : GraphEM model with DAG generation
