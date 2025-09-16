@@ -10,18 +10,32 @@ observed data. We implement a proximal-based convex optimization solver  for sol
 M-step. This approach enables an efficient and versatile processing of various sophisticated 
 priors on the graph structure, such as parsimony constraints, while benefiting from  
 convergence guarantees.  
-This toolbox consists of 6 subfolders:
+This toolbox consists of 5 subfolders:
 1) dataset  : contains the synthetic dataset from [Elvira & Chouzenoux, 2022]. 
-2) EMtools: contains functions for building EM algorithm updates
-3) losstools: contains functions for evaluating the likelihood and prior loss
-4) matrixtools: contains functions for block sparsity models and for score computations
-5) proxtools: contains functions for evaluating useful proximity operators
-6) simulators: contains functions to generate time series and initialization
+2) gradientEM: gradients and important fucntions for the models to compute the solution of the loss fucntions
+3) solvers: ADAM and L-BFGS solvers in NumPy
+4) simulators: contains functions to generate DAG adjacency matrices, time series and initialization
+5) tools: Fucntions for the correct work of all models
+    5.1) EM: contains functions for building EM algorithm updates
+    5.2) loss: contains functions for evaluating the likelihood and prior loss
+    5.3) matrix: contains functions for block sparsity models and for score computations
+    5.4) prox: contains functions for evaluating useful proximity operators
+    5.5) dag: DAG characterization and sparsity contraints for the loss functions
+    5.6) dagma: DAGMA implementation
+    5.7) l_bfgs: L-BFGS implementation
 ------------------------------------------------------------------------------------
-SPECIFICATIONS for using GraphEM:
-A demo file is provided :
-* main.py 
-
+SPECIFICATIONS for using the implemented models:
+* main.py : GraphEM model with DAG generation
+* main_expm.py : DAGraphEM model with ADAM optimizer (Torch)
+* main_dagma.py : DAGraphEM using original DAGMA implementation (loss function and solver) 
+* lbfgs_dagma.py : DAGraphEM model with L-BFGS optimizer
+* test_numpy.py : DAGraphEM model with ADAM optimizer (NumPy)
+* hyperparam_graphem.py : MLEM and GraphEM study script
+* hyperparam_test.py : DAGraphEM study script
+* threshold_study.py : Threshold study script
+* grad_desc.py : DAGrad implemented with ADAM (NumPy) - First proposition
+* grad_desc_2.py : DAGrad implemented with ADAM (NumPy) - Second proposition
+* grad_desc_torch.py : DAGrad implemented with L-BFGS optimizer - First proposition
 
 ------------------------------------------------------------------------------------
 RELATED PUBLICATIONS:
