@@ -29,7 +29,7 @@ if __name__ == "__main__":
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
 
     #Lets try new things: let's generate a DAG and use it on yhe following
-    D1, Graph = generate_random_DAG(4, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99))# Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(3, graph_type='ER', edge_prob=0.2, seed=41,weight_range=(0.1, 0.99))# Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -62,6 +62,7 @@ if __name__ == "__main__":
     specificity = np.zeros(Nreal)
     F1score = np.zeros(Nreal)
     saveX = np.zeros((Nx, K, Nreal))
+
 
     for real in range(Nreal):
         print(f"---- REALIZATION {real + 1} ----")
