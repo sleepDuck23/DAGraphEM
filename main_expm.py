@@ -57,6 +57,7 @@ if __name__ == "__main__":
     factor_alpha = 1.1
     upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
+    w_threshold = 1e-4
     
 
     reg = {}
@@ -232,7 +233,7 @@ if __name__ == "__main__":
         tEnd[real] = time.perf_counter() - tStart
         print(f"final alpha: {alpha}")
 
-        #D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
+        D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
 
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em
@@ -241,6 +242,12 @@ if __name__ == "__main__":
         D1_binary = np.abs(D1) >= threshold
         D1_em_binary = np.abs(D1_em_final) >= threshold
         TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
+
+        #RMSE support matrix
+        Err_support = np.linalg.norm(D1_binary.astype(int)  - D1_em_binary.astype(int) , 'fro') / np.linalg.norm(D1_binary.astype(int) , 'fro')
+        print(f"Final error on D1 = {Err_support:.4f}")
+        print(f"binary D1: {D1_binary}")
+        print(f"binary D1_est: {D1_em_binary}")
 
         plt.figure(30, figsize=(10, 5))
         plt.subplot(1, 2, 1)

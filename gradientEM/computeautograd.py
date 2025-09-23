@@ -190,6 +190,7 @@ def run_kalman_full_torch(A_kf, Q, x_data, z0, P0, H, R, Nx, Nz, K):
     """
     Fully differentiable Kalman filter over a time series.
     Returns all relevant KF outputs.
+    PyTorch entries and outputs.
     """
     device = A_kf.device
     dtype = A_kf.dtype

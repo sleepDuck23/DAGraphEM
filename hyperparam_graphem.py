@@ -23,7 +23,8 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # Experiment settings
-    hyperparam = [3, 5, 10, 20]
+    #hyperparam = [7, 5, 10, 20]
+    hyperparam = [10]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -34,11 +35,23 @@ if __name__ == "__main__":
     
     # Store RMSEs as: results[alpha_idx][nodes_idx] = list of RMSEs over seeds
     all_RMSE = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+    all_trunc_MSE = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+    all_trunc_MAE = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_accuracy = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_time = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_f1 = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_notears = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
     all_DAG = [[[] for _ in range(len(nodes_size))] for _ in range(len(hyperparam))]
+
+    def func_truncated_mse(A_true, A_pred):
+        support_mask = (A_true != 0)  # boolean mask for true edges
+        errors = (A_true - A_pred)[support_mask]
+        return np.mean(errors**2)
+
+    def func_truncated_mae(A_true, A_pred):
+        support_mask = (A_true != 0)  # boolean mask for true edges
+        errors = (A_true - A_pred)[support_mask]
+        return np.mean(np.abs(errors))
 
     for param in range(len(hyperparam)):
         print(f"-------------------- hyperparam: {hyperparam[param]} --------------------")
@@ -47,7 +60,7 @@ if __name__ == "__main__":
             for seeds in random_seed:
                 print(f"---- Seed: {seeds} ----")
 
-                K = 100
+                K = 500
                 flag_plot = 0
 
                 D1, Graph = generate_random_DAG(nodes_size[nodex], graph_type='ER', edge_prob=0.2, seed=seeds)
@@ -75,6 +88,8 @@ if __name__ == "__main__":
 
                 # GRAPHEM Init
                 Err_D1 = []
+                truncated_mse = []
+                truncated_mae = []
                 charac_dag = []
                 Nit_em = 50
                 prec = 1e-2
@@ -129,12 +144,16 @@ if __name__ == "__main__":
                         z0, P0, z_mean_smooth_em[:, 0].reshape(-1, 1), P_smooth_em[:, :, 0], D1_em, D2, R, Q
                     )
 
+                    
+
                     Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                         z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
 
                     # compute majorant function for ML term before update
                     Maj_before[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em, D2, Sigma, Phi, B, C, D, K)
                     Maj_before[i] = Maj_before[i] + Reg_before  # add prior term (= majorant for MAP term)
+
+                    
 
                     # 3/ EM Update
                     Maj_D1_before = ComputeMaj_D1(sigma_Q, D1_em, Sigma, Phi, C, K) + Reg_before
@@ -146,10 +165,13 @@ if __name__ == "__main__":
                     Reg_after = Compute_Prior_D1(D1_em_, reg)
                     Maj_after[i] = Maj_after[i] + Reg_after
 
+                    
                     D1_em = D1_em_  # D1 estimate updated
                     D1_em_save[:, :, i] = D1_em  # keep track of the sequence
                     Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
                     charac_dag = float(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+                    truncated_mse.append(func_truncated_mse(D1, D1_em))
+                    truncated_mae.append(func_truncated_mae(D1, D1_em))
 
                     if i > 0:
                         if np.linalg.norm(D1_em_save[:, :, i - 1] - D1_em_save[:, :, i], 'fro') / \
@@ -171,14 +193,19 @@ if __name__ == "__main__":
                 
 
                 accuracy = (TP + TN) / (TP + TN + FP + FN + 1e-8)
+                acc_adapt = (TP) / (TP + FP + FN + 1e-8)
                 RMSE = Err_D1[-1] if Err_D1 else np.nan
+                trunc_mse = truncated_mse[-1] if truncated_mse else np.nan
+                trunc_mae = truncated_mae[-1] if truncated_mae else np.nan 
                 F1score = 2 * TP / (2 * TP + FP + FN + 1e-8)
 
                 all_RMSE[param][nodex].append(RMSE)
-                all_accuracy[param][nodex].append(accuracy)
+                all_accuracy[param][nodex].append(acc_adapt)
                 all_f1[param][nodex].append(F1score)
                 all_time[param][nodex].append(tEnd)
                 all_notears[param][nodex].append(charac_dag)
+                all_trunc_MSE[param][nodex].append(trunc_mse)
+                all_trunc_MAE[param][nodex].append(trunc_mae)
 
                 TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
                 all_DAG[param][nodex].append(int(nx.is_directed_acyclic_graph(TestDAG)))
@@ -195,6 +222,8 @@ if __name__ == "__main__":
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
+                    "Trunc_MSE": all_trunc_MSE[i][j][k] if k < len(all_trunc_MSE[i][j]) else None,
+                    "Trunc_MAE": all_trunc_MAE[i][j][k] if k < len(all_trunc_MAE[i][j]) else None,
                     "Accuracy": all_accuracy[i][j][k] if k < len(all_accuracy[i][j]) else None,
                     "F1": all_f1[i][j][k] if k < len(all_f1[i][j]) else None,
                     "Time": all_time[i][j][k] if k < len(all_time[i][j]) else None,
@@ -207,7 +236,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "graphem_reg113_k100.csv"
+    csv_path = "graphem_trunc_adapt_reg113_k500.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
