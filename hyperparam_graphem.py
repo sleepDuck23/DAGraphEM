@@ -15,6 +15,7 @@ from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_upd
 from tools.prox import prox_stable
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
 from tools.dag import numpy_to_torch, logdet_dag, compute_loss
+from solvers.adam import adam
 
 
 
@@ -25,7 +26,7 @@ if __name__ == "__main__":
     # Experiment settings
     #hyperparam = [7, 5, 10, 20]
     hyperparam = [10]
-    nodes_size = [7, 10, 15, 20]
+    nodes_size = [3,4,5]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
@@ -52,6 +53,7 @@ if __name__ == "__main__":
         support_mask = (A_true != 0)  # boolean mask for true edges
         errors = (A_true - A_pred)[support_mask]
         return np.mean(np.abs(errors))
+    
 
     for param in range(len(hyperparam)):
         print(f"-------------------- hyperparam: {hyperparam[param]} --------------------")
@@ -79,7 +81,7 @@ if __name__ == "__main__":
 
                 Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q)).to(device)
 
-                reg = {'reg1': 113, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
+                reg = {'reg1': 1, 'gamma1': hyperparam[param], 'Mask': (D1 != 0)}
 
                 saveX = np.zeros((Nx, K, 1))
 
@@ -161,9 +163,13 @@ if __name__ == "__main__":
 
                     # compute majorant function for ML term after update (to check decrease)
                     Maj_after[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em_, D2, Sigma, Phi, B, C, D, K)
+
+
                     # add penalty function after update
                     Reg_after = Compute_Prior_D1(D1_em_, reg)
                     Maj_after[i] = Maj_after[i] + Reg_after
+
+                    print(f"after sparsity D1_em:\n", D1_em)
 
                     
                     D1_em = D1_em_  # D1 estimate updated
@@ -236,7 +242,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "graphem_trunc_adapt_reg113_k500.csv"
+    csv_path = "graphem_dag_test.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")

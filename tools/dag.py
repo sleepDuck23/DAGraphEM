@@ -114,6 +114,10 @@ def grad_newloss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-4):
 
     return grad_f1 + grad_f2 + grad_h 
 
+def grad_h_loss(A):
+    return 2 * A * (sla.inv(np.eye(A.shape[0]) - A*A)).T
+
+
 
 def pipa_f1_h_loss(A,K,Q,Sigma,C,Phi,alpha=0.5):
     # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))
