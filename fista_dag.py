@@ -12,27 +12,13 @@ from scipy.linalg import expm
 from tools.matrix import calError
 from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
 from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_update
-from tools.prox import prox_stable
+from tools.prox import prox_stable, prox_f3
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
-from tools.dag import numpy_to_torch, logdet_dag_torch, compute_loss, compute_new_loss, compute_loss_zero
+from tools.dag import numpy_to_torch, logdet_dag_torch, compute_loss, compute_new_loss, compute_loss_zero, grad_f1_f2, compute_F
 
 if __name__ == "__main__":
     K = 500  # length of time series
     flag_plot = 1
-
-    ## Load ground truth matrix D1
-    #try:
-    #    data = scipy.io.loadmat('dataset/D1_datasetA_icassp.mat')
-    #    D1 = data['D1']
-    #except FileNotFoundError:
-    #    print("Error: datasets/D1_datasetA_icassp.mat not found. Using a dummy D1.")
-    #    Nx = 15  # Dummy size
-    #    D1 = prox_stable(np.random.rand(Nx, Nx) - 0.5, 1)
-    #Nx = D1.shape[0]  # number of nodes
-    #Nz = Nx
-    #D2 = np.eye(Nz)  # for simplicity and identifiability purposes
-
-    #Lets try new things: let's generate a DAG and use it on yhe following
     D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40)  # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
@@ -48,25 +34,20 @@ if __name__ == "__main__":
     z0 = np.ones((Nz, 1))
 
     Q_inv = np.linalg.inv(Q)
-    Q_inv_torch = torch.linalg.inv(numpy_to_torch(Q))
 
-    reg1 = 113
-    gamma1 = 0
-    num_adam_steps = 1000
     lambda_reg = 20
     alpha = 0
     factor_alpha = 1.1
     upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
-    w_threshold = 1e-4
-    
 
-    reg = {}
-    reg['reg1'] = reg1
-    reg['gamma1'] = gamma1
-
-    Mask_true = (D1 != 0)
-    reg['Mask'] = Mask_true  # only used to try the OracleEM option ie reg.reg1=3
+    #FISTA parameters
+    L_prev = 1
+    eta = 1.5
+    jmax = 10
+    kmax = 10
+    tk = 1
+    tk_prev = 1
 
     Nreal = 1  # Number of independent runs
     tEnd = np.zeros(Nreal)
@@ -85,10 +66,6 @@ if __name__ == "__main__":
         # Synthetic data generation
         y, x = GenerateSynthetic_order_p(K, D1, D2, p, z0, sigma_P, sigma_Q, sigma_R)
         saveX[:, :, real] = x[real]
-
-        # Inference (GRAPHEM algorithm)
-        print('-- GRAPHEM + DAG --')
-        print(f"Regularization on D1: norm {reg1} with gamma1 = {gamma1}")
 
         Err_D1 = []
         charac_dag = []
@@ -136,14 +113,6 @@ if __name__ == "__main__":
                 z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
                 yk_kalman_em[:, k] = yk_kalman_em_temp.flatten()
 
-            # compute loss function (ML for now, no prior)
-            PhiK[i] = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
-
-            # compute penalty function before update
-            Reg_before = Compute_Prior_D1(D1_em, reg)
-            MLsave[i] = PhiK[i]
-            Regsave[i] = Reg_before
-            PhiK[i] = PhiK[i] + Reg_before  # update loss function
 
             # 2/ Kalman smoother
             z_mean_smooth_em = np.zeros((Nz, K))
@@ -163,55 +132,30 @@ if __name__ == "__main__":
             Sigma, Phi, B, C, D = EM_parameters(x, z_mean_smooth_em, P_smooth_em, G_smooth_em,
                                                 z_mean_smooth0_em, P_smooth0_em, G_smooth0_em)
             
-            #Implementation of the DAG caractherization function while using Adam solver for a gradient descent
-            A = torch.tensor(D1_em, dtype=torch.float32, requires_grad=True)
-            optimizer = torch.optim.Adam([A], lr=1e-4)
-
-            for step in range(num_adam_steps):
-                #Sigma_scaled = Sigma / np.linalg.norm(Sigma, 'fro')
-                #C_scaled = C / np.linalg.norm(C, 'fro')
-                #Phi_scaled = Phi / np.linalg.norm(Phi, 'fro')
-
-                # Convert all to PyTorch tensors
-                Sigma_torch = numpy_to_torch(Sigma)
-                C_torch = numpy_to_torch(C)
-                Phi_torch = numpy_to_torch(Phi)
-
-                optimizer.zero_grad()
-                #loss = compute_loss_zero(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
-                loss = compute_new_loss(A,K,Q_inv_torch,Sigma_torch,C_torch,Phi_torch,lambda_reg,alpha)
-                if not torch.isfinite(loss):
-                    print("Non-finite loss encountered")
-                    break
-                loss.backward()
-                #torch.nn.utils.clip_grad_norm_([A], max_norm=10.0)
-                optimizer.step()
-                if step % 250 == 0 and i % 10 == 0:
-                    print(f"Adam Step {step}, Loss: {loss.item():.2f}")
-                    grad_norm = A.grad.norm().item()
-                    print(f"Grad norm: {grad_norm:.2f}")
-
-            D1_em = A.detach().cpu().numpy()
-            if alpha < upper_alpha:
-                alpha *= factor_alpha*np.log(2+i)
             
-            #Below is the older implementation using MM-Douglas-Rachford method
+            #M-Step
+            Bk = D1_em.copy()
+            Ak_prev = D1_em.copy()
+            Ak = D1_em.copy()
+            for k in range(kmax):
+                tk_prev = tk
+                Gk = grad_f1_f2(Bk, K, Q_inv, C, Phi, alpha)
+                #Backtracking line search
+                for j in range(jmax):
+                    Lkj = L_prev * (eta**j)
+                    Akj = prox_f3(D1_em - (1.0 / Lkj) * Gk, Lkj, Gk, lambda_reg)
+                    if compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) <= \
+                        compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) + \
+                        np.trace((Akj - Bk)@Gk) + (Lkj/2)*np.linalg.norm(Akj - Bk, 'fro')**2:
+                        Lk = Lkj
+                        Ak = Akj
+                        break
+                tk = (1 + np.sqrt(1 + 4 * tk_prev**2)) / 2
+                Bk = Ak + ((tk_prev - 1) / tk) * (Ak - Ak_prev)
+                Ak_prev = Ak.copy()
+                L_prev = Lk
+                    
 
-            ## compute majorant function for ML term before update
-            #Maj_before[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em, D2, Sigma, Phi, B, C, D, K)
-            #Maj_before[i] = Maj_before[i] + Reg_before  # add prior term (= majorant for MAP term)
-
-            ## 3/ EM Update
-            #Maj_D1_before = ComputeMaj_D1(sigma_Q, D1_em, Sigma, Phi, C, K) + Reg_before
-            #D1_em_ = GRAPHEM_update(Sigma, Phi, C, K, sigma_Q, reg, D1_em, Maj_D1_before)
-
-            ## compute majorant function for ML term after update (to check decrease)
-            #Maj_after[i] = ComputeMaj(z0, P0, Q, R, z_mean_smooth0_em, P_smooth0_em, D1_em_, D2, Sigma, Phi, B, C, D, K)
-            ## add penalty function after update
-            #Reg_after = Compute_Prior_D1(D1_em_, reg)
-            #Maj_after[i] = Maj_after[i] + Reg_after
-
-            #D1_em = D1_em_  # D1 estimate updated
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
@@ -233,8 +177,6 @@ if __name__ == "__main__":
 
         tEnd[real] = time.perf_counter() - tStart
         print(f"final alpha: {alpha}")
-
-        D1_em[np.abs(D1_em) < w_threshold] = 0 #Eliminate edges that are close to zero0
 
         D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
         D1_em_final = D1_em

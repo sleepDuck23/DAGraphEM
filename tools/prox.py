@@ -53,6 +53,11 @@ def prox_L1(gamma, gammareg, D):
     Dprox = np.sign(D) * np.maximum(0, np.abs(D) - temp)
     return Dprox
 
+def prox_f3(Bk, Lkj, Gk, lamb):
+    X = Bk - (1.0 / Lkj) * Gk
+    tau = lamb / Lkj
+    return np.sign(X) * np.maximum(0, np.abs(X) - tau)
+
 def prox_21(W, lambda_reg):
     Nw = W.shape[1]
     Norm_rows = np.sqrt(np.sum(W**2, axis=1))
@@ -145,3 +150,4 @@ def bartels_stewart(A, B, C, D, E):
             X[i, j] = F[i, j] / denom
 
     return UA @ X @ UB.T
+

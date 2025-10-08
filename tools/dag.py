@@ -117,7 +117,31 @@ def grad_newloss(A,K,Q,Sigma,C,Phi,lambda_reg=0.1,alpha=0.5,delta=1e-4):
 def grad_h_loss(A):
     return 2 * A * (sla.inv(np.eye(A.shape[0]) - A*A)).T
 
+def grad_f1_f2(A,K,Q,C,Phi,alpha=1):
+    
+    grad_f1 = 0.5 * K * (-(Q @ C) - (Q.T @ C) + (Q.T @ A @ Phi.T) + (Q @ A @ Phi)) 
 
+    
+    grad_f2 = 2 * alpha * A * (sla.inv(np.eye(A.shape[0]) - A*A)).T
+    
+
+    return grad_f1  + grad_f2
+
+def compute_F(A,K,Q,Sigma,C,Phi,lambda_reg=1,alpha=1):
+    print("Computing new loss")
+    # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))
+    CA_T = C @ A.T
+    AC_T = A @ C.T
+    APhiA_T = A @ Phi @ A.T
+    inside = Sigma - CA_T - AC_T + APhiA_T
+    f1 = 0.5 * K * np.trace(Q @ inside)
+
+    f2 = -alpha * logdet_dag(A)
+
+    # L1 norm
+    f3 = lambda_reg * np.linalg.norm(A, ord=1)
+
+    return f1 + f2 + f3 
 
 def pipa_f1_h_loss(A,K,Q,Sigma,C,Phi,alpha=0.5):
     # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))
@@ -178,3 +202,4 @@ def grad_desc_penalty(A,lambda_reg=0.1,alpha=0.5,delta=1e-4):
     grad_h = alpha * 2 * A * (sla.inv(np.eye(A.shape[0])- A*A)).T 
 
     return f2 + h, grad_f2 + grad_h
+
