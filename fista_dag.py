@@ -140,14 +140,14 @@ if __name__ == "__main__":
             Lk = L_prev
             for k in range(kmax):
                 tk_prev = tk
-                Gk = grad_f1_f2(Bk, K, Q_inv, C, Phi, alpha)
+                Gk = grad_f1_f2(Bk, K, Q_inv, C, Phi, alpha) #possible error here!
                 #Backtracking line search
                 for j in range(jmax):
                     Lkj = L_prev * (eta**j)
-                    Akj = prox_f3(D1_em - (1.0 / Lkj) * Gk, Lkj, Gk, lambda_reg)
+                    Akj = prox_f3(Bk - (1.0 / Lkj) * Gk, Lkj, Gk, lambda_reg)
                     if compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) <= \
                         compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) + \
-                        np.trace((Akj - Bk)@Gk) + (Lkj/2)*np.linalg.norm(Akj - Bk, 'fro')**2:
+                        np.trace(Gk.T@(Akj - Bk)) + (Lkj/2)*np.linalg.norm(Akj - Bk, 'fro')**2:
                         Lk = Lkj
                         Ak = Akj
                         break
@@ -280,34 +280,4 @@ if __name__ == "__main__":
         plt.grid(True)
         plt.show()
 
-        plt.figure(6)
-        plt.semilogy(loss_dag)
-        plt.title('DAG loss of A')
-        plt.xlabel('GRAPHEM iterations')
-        plt.ylabel('Characterization')
-        plt.grid(True)
-        plt.show()
-
-        plt.figure(7)
-        plt.semilogy(alpha_values)
-        plt.title('Alpha evolution')
-        plt.xlabel('GRAPHEM iterations')
-        plt.ylabel('alpha')
-        plt.grid(True)
-        plt.show()
-
-        plt.figure(8)
-        plt.semilogy(A_norm)
-        plt.title('A norm evolution')
-        plt.xlabel('GRAPHEM iterations')
-        plt.ylabel('A norm')
-        plt.grid(True)
-        plt.show()
-
-        plt.figure(9)
-        plt.semilogy(spectral_norm)
-        plt.title('Spectral norm evolution')
-        plt.xlabel('GRAPHEM iterations')
-        plt.ylabel('Spectral norm')
-        plt.grid(True)
-        plt.show()
+       

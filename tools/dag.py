@@ -128,8 +128,7 @@ def grad_f1_f2(A,K,Q,C,Phi,alpha=1):
     return grad_f1  + grad_f2
 
 def compute_F(A,K,Q,Sigma,C,Phi,lambda_reg=1,alpha=1):
-    print("Computing new loss")
-    # f1: trace(Q^{-1} (Sigma - CA^T - AC^T + A Phi A^T))
+    
     CA_T = C @ A.T
     AC_T = A @ C.T
     APhiA_T = A @ Phi @ A.T
@@ -138,7 +137,6 @@ def compute_F(A,K,Q,Sigma,C,Phi,lambda_reg=1,alpha=1):
 
     f2 = -alpha * logdet_dag(A)
 
-    # L1 norm
     f3 = lambda_reg * np.linalg.norm(A, ord=1)
 
     return f1 + f2 + f3 
