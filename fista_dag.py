@@ -145,9 +145,15 @@ if __name__ == "__main__":
                 for j in range(jmax):
                     Lkj = L_prev * (eta**j)
                     Akj = prox_f3(Bk - (1.0 / Lkj) * Gk, Lkj, Gk, lambda_reg)
-                    if compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) <= \
-                        compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) + \
-                        np.trace(Gk.T@(Akj - Bk)) + (Lkj/2)*np.linalg.norm(Akj - Bk, 'fro')**2:
+                    F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) #result always nan!!! [To correct]
+                    F_Bk = compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha)
+                    ker_k = np.trace(Gk.T@(Akj - Bk))
+                    lip_norm = (Lkj/2)*np.linalg.norm(Akj - Bk, 'fro')**2
+
+                    print(f"Line search iteration {j}; \n Lk = {Lkj}; \n F(Akj) = {F_Akj}; \n F(Bk) = {F_Bk}; \n ker_k = {ker_k}; \n lip_norm = {lip_norm}")
+
+                    if  F_Akj <= F_Bk + ker_k + lip_norm:
+                        print("line search coindition verified")
                         Lk = Lkj
                         Ak = Akj
                         break
