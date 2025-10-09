@@ -14,7 +14,7 @@ from tools.loss import ComputeMaj_D1, ComputeMaj, Compute_PhiK, Compute_Prior_D1
 from tools.EM import Smoothing_update, Kalman_update, EM_parameters, GRAPHEM_update
 from tools.prox import prox_stable, prox_f3
 from simulators.simulators import GenerateSynthetic_order_p, CreateAdjacencyAR1, generate_random_DAG
-from tools.dag import numpy_to_torch, logdet_dag_torch, compute_loss, compute_new_loss, compute_loss_zero, grad_f1_f2, compute_F
+from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss, compute_loss_zero, grad_f1_f2, compute_F
 
 if __name__ == "__main__":
     K = 500  # length of time series
@@ -137,6 +137,7 @@ if __name__ == "__main__":
             Bk = D1_em.copy()
             Ak_prev = D1_em.copy()
             Ak = D1_em.copy()
+            Lk = L_prev
             for k in range(kmax):
                 tk_prev = tk
                 Gk = grad_f1_f2(Bk, K, Q_inv, C, Phi, alpha)
@@ -154,6 +155,8 @@ if __name__ == "__main__":
                 Bk = Ak + ((tk_prev - 1) / tk) * (Ak - Ak_prev)
                 Ak_prev = Ak.copy()
                 L_prev = Lk
+
+            D1_em = Bk.copy()
                     
 
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
@@ -161,7 +164,7 @@ if __name__ == "__main__":
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
-            dagness = numpy_to_torch(-alpha * logdet_dag_torch(A))
+            dagness = numpy_to_torch(-alpha * logdet_dag(D1_em))
             loss_dag.append(dagness)
             alpha_values.append(alpha)
             A_norm.append(np.linalg.norm(D1_em, np.inf))
