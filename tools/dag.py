@@ -135,8 +135,6 @@ def compute_F(A,K,Q,Sigma,C,Phi,lambda_reg=1,alpha=1):
 
     f3 = lambda_reg * np.linalg.norm(A, ord=1)
 
-    print(f"debug, f1: {f1}, f2: {f2}, f3: {f3}")
-
     return f1 + f2 + f3 
 
 def pipa_f1_h_loss(A,K,Q,Sigma,C,Phi,alpha=0.5):

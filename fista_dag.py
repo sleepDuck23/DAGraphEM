@@ -35,17 +35,17 @@ if __name__ == "__main__":
 
     Q_inv = np.linalg.inv(Q)
 
-    lambda_reg = 20
-    alpha = 0
-    factor_alpha = 1.1
+    lambda_reg = 7
+    alpha = 1
+    factor_alpha = 1
     upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
 
     #FISTA parameters
     L_prev = 1
     eta = 2
-    jmax = 20
-    kmax = 10
+    jmax = 10
+    kmax = 20
     tk = 1
     tk_prev = 1
 
@@ -146,16 +146,10 @@ if __name__ == "__main__":
                 for j in range(jmax):
                     Lkj = L_prev * (eta**j)
                     Akj = prox_f3(Bk - (1.0 / Lkj) * Gk, Lkj, Gk, lambda_reg)
-                    print(f"matrix A at iteration {i}, line search {j}:\n {Akj}")
-                    print(f"matrix B at iteration {i}, line search {j}:\n {Bk}")
-                    print(f"eigenvalues of A at iteration {i}, line search {j}, lipschitz {Lkj}:\n {np.linalg.eigvals(Akj)}")
-                    F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) #result always nan: logdet negative!!! [To correct]
+                    F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) 
                     F_Bk = compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha)
                     ker_k = np.trace(Gk.T@(Akj - Bk))
                     lip_norm = (Lkj/2)*np.linalg.norm(Akj - Bk, 'fro')**2
-
-                    print(f"Line search iteration {j}; \n Lk = {Lkj}; \n F(Akj) = {F_Akj}; \n F(Bk) = {F_Bk}; \n ker_k = {ker_k}; \n lip_norm = {lip_norm}")
-
                     if  F_Akj <= F_Bk + ker_k + lip_norm:
                         print("line search coindition verified")
                         Lk = Lkj
@@ -167,6 +161,9 @@ if __name__ == "__main__":
                 L_prev = Lk
 
             D1_em = Bk.copy()
+
+            if alpha < upper_alpha:
+                alpha = factor_alpha * alpha
                     
 
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
@@ -174,11 +171,13 @@ if __name__ == "__main__":
             Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
 
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
-            dagness = numpy_to_torch(-alpha * logdet_dag(D1_em))
+            dagness = -alpha * logdet_dag(D1_em)
             loss_dag.append(dagness)
             alpha_values.append(alpha)
             A_norm.append(np.linalg.norm(D1_em, np.inf))
             spectral_norm.append(np.linalg.norm(D1_em,ord=2))
+
+
 
 
             if i > 0:
@@ -201,9 +200,10 @@ if __name__ == "__main__":
 
         #RMSE support matrix
         Err_support = np.linalg.norm(D1_binary.astype(int)  - D1_em_binary.astype(int) , 'fro') / np.linalg.norm(D1_binary.astype(int) , 'fro')
-        print(f"Final error on D1 = {Err_support:.4f}")
-        print(f"binary D1: {D1_binary}")
-        print(f"binary D1_est: {D1_em_binary}")
+        
+
+        print(f"matrix D1:\n {D1}")
+        print(f"matrix D1 estimated:\n {D1_em_final}")
 
         plt.figure(30, figsize=(10, 5))
         plt.subplot(1, 2, 1)
