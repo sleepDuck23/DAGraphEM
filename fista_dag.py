@@ -19,7 +19,7 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
 if __name__ == "__main__":
     K = 500  # length of time series
     flag_plot = 1
-    D1, Graph = generate_random_DAG(5, graph_type='ER', edge_prob=0.2, seed=40)  # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(3, graph_type='ER', edge_prob=0.2, seed=40)  # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -43,8 +43,8 @@ if __name__ == "__main__":
 
     #FISTA parameters
     L_prev = 1
-    eta = 1.5
-    jmax = 10
+    eta = 2
+    jmax = 20
     kmax = 10
     tk = 1
     tk_prev = 1
@@ -79,7 +79,8 @@ if __name__ == "__main__":
 
         tStart = time.perf_counter() 
         # initialization of GRAPHEM
-        D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
+        #D1_em = prox_stable(CreateAdjacencyAR1(Nz, 0.1), 0.99)
+        D1_em = np.zeros((Nz, Nz)) 
         D1_em_save = np.zeros((Nz, Nz, Nit_em))
         PhiK = np.zeros(Nit_em)
         MLsave = np.zeros(Nit_em)
@@ -140,12 +141,15 @@ if __name__ == "__main__":
             Lk = L_prev
             for k in range(kmax):
                 tk_prev = tk
-                Gk = grad_f1_f2(Bk, K, Q_inv, C, Phi, alpha) #possible error here!
+                Gk = grad_f1_f2(Bk, K, Q_inv, C, Phi, alpha) 
                 #Backtracking line search
                 for j in range(jmax):
                     Lkj = L_prev * (eta**j)
                     Akj = prox_f3(Bk - (1.0 / Lkj) * Gk, Lkj, Gk, lambda_reg)
-                    F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) #result always nan!!! [To correct]
+                    print(f"matrix A at iteration {i}, line search {j}:\n {Akj}")
+                    print(f"matrix B at iteration {i}, line search {j}:\n {Bk}")
+                    print(f"eigenvalues of A at iteration {i}, line search {j}, lipschitz {Lkj}:\n {np.linalg.eigvals(Akj)}")
+                    F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) #result always nan: logdet negative!!! [To correct]
                     F_Bk = compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha)
                     ker_k = np.trace(Gk.T@(Akj - Bk))
                     lip_norm = (Lkj/2)*np.linalg.norm(Akj - Bk, 'fro')**2

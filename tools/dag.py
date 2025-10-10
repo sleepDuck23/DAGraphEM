@@ -20,12 +20,8 @@ def logdet_dag_torch(A):
     return logdet
 
 def logdet_dag(A):
-    # A∘A = elementwise square, I = identity
     I = np.eye(A.shape[0])
     mat = I - A * A
-    # To ensure numerical stability add small jitter
-    #jitter = 1e-6 * I
-    #mat = mat + jitter
     # logdet can be computed with torch.slogdet for stability
     sign, logdet = np.linalg.slogdet(mat)
     if (sign <= 0).any():
@@ -138,6 +134,8 @@ def compute_F(A,K,Q,Sigma,C,Phi,lambda_reg=1,alpha=1):
     f2 = -alpha * logdet_dag(A)
 
     f3 = lambda_reg * np.linalg.norm(A, ord=1)
+
+    print(f"debug, f1: {f1}, f2: {f2}, f3: {f3}")
 
     return f1 + f2 + f3 
 
