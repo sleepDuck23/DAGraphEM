@@ -35,9 +35,9 @@ if __name__ == "__main__":
 
     Q_inv = np.linalg.inv(Q)
 
-    lambda_reg = 7
+    lambda_reg = 5
     alpha = 1
-    factor_alpha = 1
+    factor_alpha = 2
     upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
 
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     L_prev = 1
     eta = 2
     jmax = 10
-    kmax = 20
+    kmax = 100
     tk = 1
     tk_prev = 1
 
@@ -73,7 +73,7 @@ if __name__ == "__main__":
         A_norm = []
         spectral_norm = []
         alpha_values = []
-        Nit_em = 50  # number of iterations maximum for EM loop
+        Nit_em = 20  # number of iterations maximum for EM loop
         prec = 1e-2  # precision for EM loop
         prec_dag = 1e-9
 
@@ -114,7 +114,7 @@ if __name__ == "__main__":
                 z_mean_kalman_em[:, k] = z_mean_kalman_em_temp.flatten()
                 yk_kalman_em[:, k] = yk_kalman_em_temp.flatten()
 
-
+            PhiK[i] = Compute_PhiK(0, Sk_kalman_em, yk_kalman_em)
             # 2/ Kalman smoother
             z_mean_smooth_em = np.zeros((Nz, K))
             P_smooth_em = np.zeros((Nz, Nz, K))
@@ -151,7 +151,6 @@ if __name__ == "__main__":
                     ker_k = np.trace(Gk.T@(Akj - Bk))
                     lip_norm = (Lkj/2)*np.linalg.norm(Akj - Bk, 'fro')**2
                     if  F_Akj <= F_Bk + ker_k + lip_norm:
-                        print("line search coindition verified")
                         Lk = Lkj
                         Ak = Akj
                         break
@@ -162,13 +161,16 @@ if __name__ == "__main__":
 
             D1_em = Bk.copy()
 
+            err = np.linalg.norm(D1_em - D1, 'fro') / np.linalg.norm(D1, 'fro')
+
             if alpha < upper_alpha:
                 alpha = factor_alpha * alpha
+                print(f"update alpha: {alpha}")
                     
 
             D1_em_save[:, :, i] = D1_em  # keep track of the sequence
 
-            Err_D1.append(np.linalg.norm(D1 - D1_em, 'fro') / np.linalg.norm(D1, 'fro'))
+            Err_D1.append(err)
 
             charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
             dagness = -alpha * logdet_dag(D1_em)
@@ -198,12 +200,12 @@ if __name__ == "__main__":
         D1_em_binary = np.abs(D1_em_final) >= threshold
         TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
 
+        print(f"final matrix D1:\n{D1_em_final}")
+        print(f"true matrix D1:\n{D1}")
+
         #RMSE support matrix
         Err_support = np.linalg.norm(D1_binary.astype(int)  - D1_em_binary.astype(int) , 'fro') / np.linalg.norm(D1_binary.astype(int) , 'fro')
         
-
-        print(f"matrix D1:\n {D1}")
-        print(f"matrix D1 estimated:\n {D1_em_final}")
 
         plt.figure(30, figsize=(10, 5))
         plt.subplot(1, 2, 1)

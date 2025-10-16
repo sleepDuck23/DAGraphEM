@@ -41,7 +41,7 @@ def Kalman_update(y_k,xk_mean_past,Pk_past,A,H,R,Q):
 
     vk = y_k - H @ xk_minus
     Sk = H @ Pk_minus @ H.T + R
-    Kk = Pk_minus @ H.T @ np.linalg.inv(Sk)
+    Kk = Pk_minus @ H.T @  np.linalg.inv(Sk)
     xk_mean_new = xk_minus + Kk @ vk
     Pk_new = Pk_minus - Kk @ Sk @ Kk.T
 
