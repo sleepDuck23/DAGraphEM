@@ -35,19 +35,17 @@ if __name__ == "__main__":
 
     Q_inv = np.linalg.inv(Q)
 
-    lambda_reg = 5
+    lambda_reg = 20
     alpha = 1
-    factor_alpha = 2
+    factor_alpha = 1.5
     upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
 
     #FISTA parameters
-    L_prev = 1
-    eta = 2
-    jmax = 10
-    kmax = 100
+    eta = 2.0
+    jmax = 15
+    kmax = 10
     tk = 1
-    tk_prev = 1
 
     Nreal = 1  # Number of independent runs
     tEnd = np.zeros(Nreal)
@@ -73,7 +71,7 @@ if __name__ == "__main__":
         A_norm = []
         spectral_norm = []
         alpha_values = []
-        Nit_em = 20  # number of iterations maximum for EM loop
+        Nit_em = 10  # number of iterations maximum for EM loop
         prec = 1e-2  # precision for EM loop
         prec_dag = 1e-9
 
@@ -135,29 +133,62 @@ if __name__ == "__main__":
             
             
             #M-Step
+            # I loop initialization
             Bk = D1_em.copy()
+            Bk_prev = D1_em.copy()
             Ak_prev = D1_em.copy()
             Ak = D1_em.copy()
-            Lk = L_prev
+            L_prev = 1.0
+            Lk = 1.0
+            tk_prev = 1.0
+
+            # K loop
             for k in range(kmax):
-                tk_prev = tk
-                Gk = grad_f1_f2(Bk, K, Q_inv, C, Phi, alpha) 
+                Gk = grad_f1_f2(Bk, K, Q_inv, C, Phi, alpha) # Gradient at iteration k
+                
                 #Backtracking line search
+                # J loop
                 for j in range(jmax):
                     Lkj = L_prev * (eta**j)
-                    Akj = prox_f3(Bk - (1.0 / Lkj) * Gk, Lkj, Gk, lambda_reg)
-                    F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) 
-                    F_Bk = compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha)
-                    ker_k = np.trace(Gk.T@(Akj - Bk))
-                    lip_norm = (Lkj/2)*np.linalg.norm(Akj - Bk, 'fro')**2
-                    if  F_Akj <= F_Bk + ker_k + lip_norm:
+
+                    Akj = prox_f3(Bk, Lkj, Gk, lambda_reg) # Soft Thresholding Operator
+
+                    F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) # Backtracking condition term
+                    F_Bk = compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha)   # Backtracking condition term 
+                    ker_k = np.trace(Gk.T @ (Akj - Bk))                                # Backtracking condition term
+                    lip_norm = (Lkj/2)*(np.linalg.norm(Akj - Bk, 'fro')**2)            # Backtracking condition term
+
+                    print(f"Iteration I= {i}, k={k}, j={j}")
+
+
+                    print(f"backtracking iter L={Lkj}, F(Akj)={F_Akj}, F(Bk)={F_Bk}, ker_k={ker_k}, lip_norm={lip_norm}")
+                    print(f"bactracking condition left: {F_Akj} right: {(F_Bk + ker_k + lip_norm)}")
+                    eigvals = np.linalg.eigvalsh(Akj)
+                    print(f"eigenvalues {eigvals}")
+
+                    print(f"matrix Akj:\n{Akj}")
+                    print("---------------------------")
+                    print(f"matrix Bk:\n{Bk}")
+
+
+                    if  F_Akj <= F_Bk + ker_k + lip_norm: # Backtracking condition
+                        print(f"Condition satisfied at loop k={k} and loop j={j} with L={Lkj}")
+                        L_prev = Lk # L from previous iteration k
                         Lk = Lkj
+                        Ak_prev = Ak.copy()
                         Ak = Akj
                         break
+
+                tk_prev = tk # tk from previous iteration k
                 tk = (1 + np.sqrt(1 + 4 * tk_prev**2)) / 2
+                Bk_prev = Bk.copy()
                 Bk = Ak + ((tk_prev - 1) / tk) * (Ak - Ak_prev)
-                Ak_prev = Ak.copy()
-                L_prev = Lk
+
+                # Stopping criterion for the K loop
+                #if k > 4 and np.linalg.norm(Bk - Bk_prev, 'fro') / np.linalg.norm(Bk_prev, 'fro') < 1e-4:
+                #    print(f"  FISTA converged after iteration {k + 1}")
+                #    break
+                
 
             D1_em = Bk.copy()
 
