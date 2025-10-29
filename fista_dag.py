@@ -35,15 +35,15 @@ if __name__ == "__main__":
 
     Q_inv = np.linalg.inv(Q)
 
-    lambda_reg = 20
+    lambda_reg = 15
     alpha = 1
-    factor_alpha = 1.5
+    factor_alpha = 2
     upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
 
     #FISTA parameters
-    eta = 2.0
-    jmax = 15
+    eta = 1.5
+    jmax = 20
     kmax = 10
     tk = 1
 
@@ -71,8 +71,8 @@ if __name__ == "__main__":
         A_norm = []
         spectral_norm = []
         alpha_values = []
-        Nit_em = 10  # number of iterations maximum for EM loop
-        prec = 1e-2  # precision for EM loop
+        Nit_em = 20  # number of iterations maximum for EM loop
+        prec = 1e-3  # precision for EM loop
         prec_dag = 1e-9
 
         tStart = time.perf_counter() 
@@ -158,17 +158,15 @@ if __name__ == "__main__":
                     ker_k = np.trace(Gk.T @ (Akj - Bk))                                # Backtracking condition term
                     lip_norm = (Lkj/2)*(np.linalg.norm(Akj - Bk, 'fro')**2)            # Backtracking condition term
 
-                    print(f"Iteration I= {i}, k={k}, j={j}")
+                    #print(f"Iteration I= {i}, k={k}, j={j}")
 
 
-                    print(f"backtracking iter L={Lkj}, F(Akj)={F_Akj}, F(Bk)={F_Bk}, ker_k={ker_k}, lip_norm={lip_norm}")
-                    print(f"bactracking condition left: {F_Akj} right: {(F_Bk + ker_k + lip_norm)}")
-                    eigvals = np.linalg.eigvalsh(Akj)
-                    print(f"eigenvalues {eigvals}")
+                    #print(f"backtracking iter L={Lkj}, F(Akj)={F_Akj}, F(Bk)={F_Bk}, ker_k={ker_k}, lip_norm={lip_norm}")
+                    #print(f"bactracking condition left: {F_Akj} right: {(F_Bk + ker_k + lip_norm)}")
 
-                    print(f"matrix Akj:\n{Akj}")
-                    print("---------------------------")
-                    print(f"matrix Bk:\n{Bk}")
+                    #print(f"matrix Akj:\n{Akj}")
+                    #print("---------------------------")
+                    #print(f"matrix Bk:\n{Bk}")
 
 
                     if  F_Akj <= F_Bk + ker_k + lip_norm: # Backtracking condition
