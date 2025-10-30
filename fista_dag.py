@@ -19,7 +19,7 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
 if __name__ == "__main__":
     K = 500  # length of time series
     flag_plot = 1
-    D1, Graph = generate_random_DAG(3, graph_type='ER', edge_prob=0.2, seed=40)  # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(15, graph_type='ER', edge_prob=0.2, seed=40)  # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -35,14 +35,14 @@ if __name__ == "__main__":
 
     Q_inv = np.linalg.inv(Q)
 
-    lambda_reg = 15
+    lambda_reg = 20
     alpha = 1
-    factor_alpha = 2
+    factor_alpha = 1.5
     upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
 
     #FISTA parameters
-    eta = 1.5
+    eta = 2
     jmax = 20
     kmax = 10
     tk = 1
@@ -183,9 +183,9 @@ if __name__ == "__main__":
                 Bk = Ak + ((tk_prev - 1) / tk) * (Ak - Ak_prev)
 
                 # Stopping criterion for the K loop
-                #if k > 4 and np.linalg.norm(Bk - Bk_prev, 'fro') / np.linalg.norm(Bk_prev, 'fro') < 1e-4:
-                #    print(f"  FISTA converged after iteration {k + 1}")
-                #    break
+                if k > 4 and np.linalg.norm(Bk - Bk_prev, 'fro') / np.linalg.norm(Bk_prev, 'fro') < 1e-4:
+                    print(f"  FISTA converged after iteration {k + 1}")
+                    break
                 
 
             D1_em = Bk.copy()
