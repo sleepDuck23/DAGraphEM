@@ -259,6 +259,7 @@ if __name__ == "__main__":
         nx.draw(G_est, pos, width=linewidths_est, with_labels=False, node_size=30, arrowsize=10)
         plt.title('Estimated D1 Network')
         plt.tight_layout()
+        plt.savefig(f'DAG_graph_realization_{real + 1}.png', dpi=300)
         plt.show()
 
         precision[real] = TP / (TP + FP + 1e-8)
@@ -296,6 +297,7 @@ if __name__ == "__main__":
         plt.colorbar()
         plt.title('Estimated D1')
         plt.axis('off')
+        plt.savefig('D1_matrices.png', dpi=300)
         plt.show()
 
         plt.figure(3)
