@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import time
 import networkx as nx
 from scipy.linalg import expm
+import pandas as pd
 
 from tools.matrix import calError
 from tools.loss import Compute_PhiK
@@ -11,6 +12,7 @@ from tools.EM import Smoothing_update, Kalman_update, EM_parameters
 from tools.prox import prox_f3
 from simulators.simulators import GenerateSynthetic_order_p, generate_random_DAG
 from tools.dag import logdet_dag, grad_f1_f2, compute_F
+
 
 if __name__ == "__main__":
     # Experiment settings
@@ -80,13 +82,6 @@ if __name__ == "__main__":
                 tk = 1
 
                 Nreal = 1  # Number of independent runs
-                tEnd = np.zeros(Nreal)
-                RMSE = np.zeros(Nreal)
-                accuracy = np.zeros(Nreal)
-                precision = np.zeros(Nreal)
-                recall = np.zeros(Nreal)
-                specificity = np.zeros(Nreal)
-                F1score = np.zeros(Nreal)
                 saveX = np.zeros((Nx, K, Nreal))
 
 
@@ -103,6 +98,8 @@ if __name__ == "__main__":
                     A_norm = []
                     spectral_norm = []
                     alpha_values = []
+                    truncated_mse = []
+                    truncated_mae = []
                     Nit_em = 20  # number of iterations maximum for EM loop
                     prec = 1e-3  # precision for EM loop
                     prec_dag = 1e-9
@@ -183,10 +180,10 @@ if __name__ == "__main__":
                             for j in range(jmax):
                                 Lkj = L_prev * (eta**j)
 
-                                Akj = prox_f3(Bk, Lkj, Gk, lambda_reg) # Soft Thresholding Operator
+                                Akj = prox_f3(Bk, Lkj, Gk, hyperparam[param]) # Soft Thresholding Operator
 
-                                F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) # Backtracking condition term
-                                F_Bk = compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha)   # Backtracking condition term 
+                                F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, hyperparam[param], alpha) # Backtracking condition term
+                                F_Bk = compute_F(Bk, K, Q_inv, Sigma, C, Phi, hyperparam[param], alpha)   # Backtracking condition term 
                                 ker_k = np.trace(Gk.T @ (Akj - Bk))                                # Backtracking condition term
                                 lip_norm = (Lkj/2)*(np.linalg.norm(Akj - Bk, 'fro')**2)            # Backtracking condition term
 
@@ -234,12 +231,15 @@ if __name__ == "__main__":
 
                         Err_D1.append(err)
 
-                        charac_dag.append(np.trace(expm(D1_em*D1_em))-D1_em[0].shape)
+                        dagness = np.trace(expm(D1_em*D1_em))-D1_em[0].shape
+                        charac_dag.append(dagness)
                         dagness = -alpha * logdet_dag(D1_em)
                         loss_dag.append(dagness)
                         alpha_values.append(alpha)
                         A_norm.append(np.linalg.norm(D1_em, np.inf))
                         spectral_norm.append(np.linalg.norm(D1_em,ord=2))
+                        truncated_mse.append(func_truncated_mse(D1, D1_em))
+                        truncated_mae.append(func_truncated_mae(D1, D1_em))
 
 
                         if i > 0:
@@ -250,45 +250,48 @@ if __name__ == "__main__":
             
 
 
-            tEnd[real] = time.perf_counter() - tStart
-            print(f"final alpha: {alpha}")
+                tEnd = time.perf_counter() - tStart
+                print(f"final alpha: {alpha}")
 
-            D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
-            D1_em_final = D1_em
+                D1_em_save_realization = D1_em_save[:, :, :len(Err_D1)]
+                D1_em_final = D1_em
 
-            threshold = 1e-10
-            D1_binary = np.abs(D1) >= threshold
-            D1_em_binary = np.abs(D1_em_final) >= threshold
-            TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
+                threshold = 1e-10
+                D1_binary = np.abs(D1) >= threshold
+                D1_em_binary = np.abs(D1_em_final) >= threshold
+                TP, FP, TN, FN = calError(D1_binary, D1_em_binary)
 
-            print(f"final matrix D1:\n{D1_em_final}")
-            print(f"true matrix D1:\n{D1}")
+                print(f"final matrix D1:\n{D1_em_final}")
+                print(f"true matrix D1:\n{D1}")
 
-            #RMSE support matrix
-            Err_support = np.linalg.norm(D1_binary.astype(int)  - D1_em_binary.astype(int) , 'fro') / np.linalg.norm(D1_binary.astype(int) , 'fro')
+                #RMSE support matrix
+                Err_support = np.linalg.norm(D1_binary.astype(int)  - D1_em_binary.astype(int) , 'fro') / np.linalg.norm(D1_binary.astype(int) , 'fro')
 
 
-            precision[real] = TP / (TP + FP + 1e-8)
-            recall[real] = TP / (TP + FN + 1e-8)
-            specificity[real] = TN / (TN + FP + 1e-8)
-            accuracy[real] = (TP + TN) / (TP + TN + FP + FN + 1e-8)
-            RMSE[real] = Err_D1[-1] if Err_D1 else np.nan
-            F1score[real] = 2 * TP / (2 * TP + FP + FN + 1e-8)
+                precision = TP / (TP + FP + 1e-8)
+                recall = TP / (TP + FN + 1e-8)
+                specificity = TN / (TN + FP + 1e-8)
+                accuracy = (TP + TN) / (TP + TN + FP + FN + 1e-8)
+                RMSE = Err_D1[-1] if Err_D1 else np.nan
+                F1score = 2 * TP / (2 * TP + FP + FN + 1e-8)
+                trunc_mse = truncated_mse[-1] if truncated_mse else np.nan
+                trunc_mae = truncated_mae[-1] if truncated_mae else np.nan  
+                
 
-            TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
-            print(int(nx.is_directed_acyclic_graph(TestDAG)))
+                TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
+                print(int(nx.is_directed_acyclic_graph(TestDAG)))
 
-            # novidade
-            all_RMSE[param][nodex].append(RMSE)
-            all_accuracy[param][nodex].append(acc_adapt)
-            all_f1[param][nodex].append(F1score)
-            all_time[param][nodex].append(tEnd)
-            all_notears[param][nodex].append(charac_dag)
-            all_trunc_MSE[param][nodex].append(trunc_mse)
-            all_trunc_MAE[param][nodex].append(trunc_mae)
+                # novidade
+                all_RMSE[param][nodex].append(RMSE)
+                all_accuracy[param][nodex].append(accuracy)
+                all_f1[param][nodex].append(F1score)
+                all_time[param][nodex].append(tEnd)
+                all_notears[param][nodex].append(dagness)
+                all_trunc_MSE[param][nodex].append(trunc_mse)
+                all_trunc_MAE[param][nodex].append(trunc_mae)
 
-            TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
-            all_DAG[param][nodex].append(int(nx.is_directed_acyclic_graph(TestDAG)))
+                TestDAG = nx.from_numpy_array(D1_em_final, create_using=nx.DiGraph)
+                all_DAG[param][nodex].append(int(nx.is_directed_acyclic_graph(TestDAG)))
 
             
 
@@ -299,7 +302,7 @@ if __name__ == "__main__":
         for j, n_nodes in enumerate(nodes_size):
             for k, seed_idx in enumerate(random_seed):
                 result_dict = {
-                    "alpha": hyperparam_val,
+                    "lambda": hyperparam_val,
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
