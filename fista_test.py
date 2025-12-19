@@ -16,7 +16,7 @@ from tools.dag import logdet_dag, grad_f1_f2, compute_F
 
 if __name__ == "__main__":
     # Experiment settings
-    hyperparam = [5, 7, 10, 20]
+    hyperparam = [i for i in range(5, 51)]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "fista_trunc_adapt_500.csv"
+    csv_path = "fista_50_500.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
