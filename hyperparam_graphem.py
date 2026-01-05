@@ -25,8 +25,9 @@ if __name__ == "__main__":
 
     # Experiment settings
     #hyperparam = [7, 5, 10, 20]
-    hyperparam = [10]
-    nodes_size = [3,4,5]
+    hyperparam = [i for i in range(5, 50)]
+    hyperparam = [0]
+    nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
     print(f"Defined Hyperparameter values: {hyperparam}")
@@ -242,7 +243,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "graphem_dag_test.csv"
+    csv_path = "mlem_500_test_fista.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")

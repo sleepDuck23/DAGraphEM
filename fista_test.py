@@ -16,7 +16,9 @@ from tools.dag import logdet_dag, grad_f1_f2, compute_F
 
 if __name__ == "__main__":
     # Experiment settings
-    hyperparam = [i for i in range(5, 51)]
+    #hyperparam = [float(i) / 4 for i in range(1, 20)]
+    #hyperparam = hyperparam/4.0  # alpha scaling factors
+    hyperparam = [i for i in range(5, 25)]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -74,6 +76,7 @@ if __name__ == "__main__":
                 factor_alpha = 1.5
                 upper_alpha = 1e8  # upper bound for alpha
                 stepsize = 0.1
+
 
                 #FISTA parameters
                 eta = 1.5
@@ -180,10 +183,10 @@ if __name__ == "__main__":
                             for j in range(jmax):
                                 Lkj = L_prev * (eta**j)
 
-                                Akj = prox_f3(Bk, Lkj, Gk, hyperparam[param]) # Soft Thresholding Operator
+                                Akj = prox_f3(Bk, Lkj, Gk, lambda_reg) # Soft Thresholding Operator
 
-                                F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, hyperparam[param], alpha) # Backtracking condition term
-                                F_Bk = compute_F(Bk, K, Q_inv, Sigma, C, Phi, hyperparam[param], alpha)   # Backtracking condition term 
+                                F_Akj = compute_F(Akj, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha) # Backtracking condition term
+                                F_Bk = compute_F(Bk, K, Q_inv, Sigma, C, Phi, lambda_reg, alpha)   # Backtracking condition term 
                                 ker_k = np.trace(Gk.T @ (Akj - Bk))                                # Backtracking condition term
                                 lip_norm = (Lkj/2)*(np.linalg.norm(Akj - Bk, 'fro')**2)            # Backtracking condition term
 
@@ -223,7 +226,7 @@ if __name__ == "__main__":
                         err = np.linalg.norm(D1_em - D1, 'fro') / np.linalg.norm(D1, 'fro')
 
                         if alpha < upper_alpha:
-                            alpha = factor_alpha * alpha
+                            alpha = hyperparam[param] * alpha
                             print(f"update alpha: {alpha}")
 
 
@@ -302,7 +305,7 @@ if __name__ == "__main__":
         for j, n_nodes in enumerate(nodes_size):
             for k, seed_idx in enumerate(random_seed):
                 result_dict = {
-                    "lambda": hyperparam_val,
+                    "alpha_factor": hyperparam_val,
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
@@ -320,7 +323,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "fista_50_500.csv"
+    csv_path = "fista_alphafac_500.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")
