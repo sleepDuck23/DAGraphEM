@@ -18,7 +18,8 @@ if __name__ == "__main__":
     # Experiment settings
     #hyperparam = [float(i) / 4 for i in range(1, 20)]
     #hyperparam = hyperparam/4.0  # alpha scaling factors
-    hyperparam = [i for i in range(5, 25)]
+    #hyperparam = [i for i in range(0, 51, 5)]
+    hyperparam = [1, 2, 5, 7, 10]
     nodes_size = [7, 10, 15, 20]
     random_seed = [40,41,42,43,44,45,46,47,48,49]
 
@@ -55,7 +56,7 @@ if __name__ == "__main__":
 
                 K = 500  # length of time series
                 flag_plot = 1
-                D1, Graph = generate_random_DAG(3, graph_type='ER', edge_prob=0.2, seed=41)  # Could also use the prox stable too (test it after)
+                D1, Graph = generate_random_DAG(nodes_size[nodex], graph_type='ER', edge_prob=0.2, seed=seeds)  # Could also use the prox stable too (test it after)
                 Nx = D1.shape[0]  # number of nodes
                 Nz = Nx
                 D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -73,8 +74,8 @@ if __name__ == "__main__":
 
                 lambda_reg = 10
                 alpha = 1
-                factor_alpha = 1.5
-                upper_alpha = 1e8  # upper bound for alpha
+                factor_alpha = hyperparam[param]
+                upper_alpha = 1.5e3  # upper bound for alpha
                 stepsize = 0.1
 
 
@@ -226,7 +227,7 @@ if __name__ == "__main__":
                         err = np.linalg.norm(D1_em - D1, 'fro') / np.linalg.norm(D1, 'fro')
 
                         if alpha < upper_alpha:
-                            alpha = hyperparam[param] * alpha
+                            alpha = factor_alpha * alpha
                             print(f"update alpha: {alpha}")
 
 
@@ -305,7 +306,7 @@ if __name__ == "__main__":
         for j, n_nodes in enumerate(nodes_size):
             for k, seed_idx in enumerate(random_seed):
                 result_dict = {
-                    "alpha_factor": hyperparam_val,
+                    "factor": hyperparam_val,
                     "nodes_size": n_nodes,
                     "seed": seed_idx,
                     "RMSE": all_RMSE[i][j][k] if k < len(all_RMSE[i][j]) else None,
@@ -323,7 +324,7 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results_list)
 
     # Save to CSV
-    csv_path = "fista_alphafac_500.csv"
+    csv_path = "fista_h_alpha_500.csv"
     results_df.to_csv(csv_path, index=False)
 
     print(f"Results saved to {csv_path}")

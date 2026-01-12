@@ -19,7 +19,7 @@ from tools.dag import numpy_to_torch, logdet_dag, compute_loss, compute_new_loss
 if __name__ == "__main__":
     K = 500  # length of time series
     flag_plot = 1
-    D1, Graph = generate_random_DAG(3, graph_type='ER', edge_prob=0.2, seed=41)  # Could also use the prox stable too (test it after)
+    D1, Graph = generate_random_DAG(20, graph_type='ER', edge_prob=0.2, seed=41)  # Could also use the prox stable too (test it after)
     Nx = D1.shape[0]  # number of nodes
     Nz = Nx
     D2 = np.eye(Nz)  # for simplicity and identifiability purposes
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     lambda_reg = 10
     alpha = 1
-    factor_alpha = 1.5
+    factor_alpha = 1
     upper_alpha = 1e8  # upper bound for alpha
     stepsize = 0.1
 
